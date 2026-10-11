@@ -19,6 +19,8 @@ public class SecurityConfig {
         http
                 // CSRF protects cookie-based sessions; this API sends credentials on every request instead.
                 .csrf(AbstractHttpConfigurer::disable)
+                // Uses the CorsConfigurationSource bean from CorsConfig.
+                .cors(Customizer.withDefaults())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
