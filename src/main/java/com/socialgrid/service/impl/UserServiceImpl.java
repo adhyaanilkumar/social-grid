@@ -41,10 +41,10 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public UserResponse register(RegisterRequest request) {
         if (userRepository.existsByUsername(request.username())) {
-            throw new ConflictException("Username already taken");
+            throw new ConflictException("username", "Username already taken");
         }
         if (userRepository.existsByEmail(request.email())) {
-            throw new ConflictException("Email already registered");
+            throw new ConflictException("email", "Email already registered");
         }
         User user = userRepository.save(
                 new User(request.username(), passwordEncoder.encode(request.password()), request.email()));
@@ -69,7 +69,7 @@ public class UserServiceImpl implements UserService {
     public UserResponse updateEmail(Integer userId, EmailUpdateRequest request) {
         User user = findUser(userId);
         if (!request.email().equals(user.getEmail()) && userRepository.existsByEmail(request.email())) {
-            throw new ConflictException("Email already registered");
+            throw new ConflictException("email", "Email already registered");
         }
         user.setEmail(request.email());
         return toResponse(user);

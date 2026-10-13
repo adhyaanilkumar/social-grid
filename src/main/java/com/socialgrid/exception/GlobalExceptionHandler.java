@@ -6,12 +6,16 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.sql.SQLException;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 // Turns exceptions thrown anywhere in a controller or service into JSON error responses.
@@ -20,6 +24,9 @@ public class GlobalExceptionHandler {
 
     // Postgres SQLSTATE for foreign_key_violation.
     private static final String FOREIGN_KEY_VIOLATION = "23503";
+
+    // Error code Bean Validation gives a failed @NotBlank.
+    private static final String NOT_BLANK = "NotBlank";
 
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(NotFoundException e) {
@@ -33,7 +40,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ErrorResponse> handleConflict(ConflictException e) {
-        return build(HttpStatus.CONFLICT, e.getMessage());
+        Map<String, String> fieldErrors = e.getField() == null ? null : Map.of(e.getField(), e.getMessage());
+        return build(HttpStatus.CONFLICT, e.getMessage(), fieldErrors);
     }
 
     @ExceptionHandler(BadRequestException.class)
@@ -43,10 +51,19 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException e) {
-        String message = e.getBindingResult().getFieldErrors().stream()
+        List<FieldError> errors = e.getBindingResult().getFieldErrors();
+        String message = errors.stream()
                 .map(err -> err.getField() + ": " + err.getDefaultMessage())
                 .collect(Collectors.joining("; "));
-        return build(HttpStatus.BAD_REQUEST, message);
+        // One message per field. A blank value also fails @Size, and the validator reports the two in no fixed
+        // order, so "is required" always wins over the length message.
+        Map<String, String> fieldErrors = new LinkedHashMap<>();
+        for (FieldError err : errors) {
+            if (NOT_BLANK.equals(err.getCode()) || !fieldErrors.containsKey(err.getField())) {
+                fieldErrors.put(err.getField(), err.getDefaultMessage());
+            }
+        }
+        return build(HttpStatus.BAD_REQUEST, message, fieldErrors);
     }
 
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
@@ -67,7 +84,11 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<ErrorResponse> build(HttpStatus status, String message) {
+        return build(status, message, null);
+    }
+
+    private ResponseEntity<ErrorResponse> build(HttpStatus status, String message, Map<String, String> fieldErrors) {
         return ResponseEntity.status(status)
-                .body(new ErrorResponse(status.value(), status.getReasonPhrase(), message));
+                .body(new ErrorResponse(status.value(), status.getReasonPhrase(), message, fieldErrors));
     }
 }

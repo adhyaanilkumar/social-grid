@@ -8,6 +8,8 @@ export interface ErrorBody {
   status: number
   error: string
   message: string
+  // Present when the error is about specific request fields, e.g. { username: 'Username already taken' }.
+  fieldErrors?: Record<string, string>
 }
 
 // Thrown for any non-2xx response, so callers (and TanStack Query) see a normal rejected promise.
