@@ -6,6 +6,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -47,6 +48,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<ErrorResponse> handleBadRequest(BadRequestException e) {
         return build(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    // Same message for an unknown account and a wrong password, so the response can't be used to find out
+    // which usernames or emails are registered.
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException e) {
+        return build(HttpStatus.UNAUTHORIZED, "Invalid username/email or password");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

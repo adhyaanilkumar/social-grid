@@ -16,4 +16,8 @@ export default defineConfig({
     // "@/components/ui/button" resolves to src/components/ui/button; shadcn and 21st.dev code import this way.
     alias: { '@': path.resolve(import.meta.dirname, './src') },
   },
+  // The browser only ever talks to the Vite server; /api calls are forwarded to Spring Boot. Same origin
+  // means the session cookie is sent without any CORS setup (nginx does the same job in Docker).
+  server: { proxy: { '/api': 'http://localhost:8080' } },
+  preview: { proxy: { '/api': 'http://localhost:8080' } },
 })

@@ -8,9 +8,8 @@ import string
 import uuid
 
 import pytest
-import requests
 
-BASE = os.environ.get("SOCIAL_GRID_URL", "http://localhost:8080")
+from helpers import BASE, csrf_session, login
 REGISTER = f"{BASE}/api/auth/register"
 PASSWORD = "password1"
 
@@ -25,7 +24,8 @@ def fresh():
 
 
 def register(body):
-    return requests.post(REGISTER, json=body, timeout=10)
+    # Register is a POST, so it needs the CSRF cookie + header like every other non-GET (AD-264).
+    return csrf_session().post(REGISTER, json=body)
 
 
 def register_ok(body=None):
@@ -144,7 +144,7 @@ def test_registered_72_char_password_can_log_in():
     body = fresh()
     body["password"] = "p" * 72
     register_ok(body)
-    r = requests.get(f"{BASE}/api/auth/login", auth=(body["username"], body["password"]), timeout=10)
+    _, r = login(body["username"], body["password"])
     assert r.status_code == 200, r.text
 
 
@@ -188,7 +188,7 @@ def test_validation_runs_before_duplicate_check():
 
 @pytest.mark.parametrize("raw", ['{"username":', "[]", ""])
 def test_malformed_json_is_400_without_field_errors(raw):
-    r = requests.post(REGISTER, data=raw, headers={"Content-Type": "application/json"}, timeout=10)
+    r = csrf_session().post(REGISTER, data=raw, headers={"Content-Type": "application/json"})
     assert r.status_code == 400
     body = r.json()
     assert body["message"] == "Malformed request"
@@ -198,40 +198,42 @@ def test_malformed_json_is_400_without_field_errors(raw):
 @pytest.fixture
 def user():
     body, created = register_ok()
-    return {**body, "id": created["id"], "auth": (body["username"], body["password"])}
+    s, r = login(body["username"], body["password"])
+    assert r.status_code == 200, r.text
+    return {**body, "id": created["id"], "session": s}
 
 
 def test_follow_twice_is_409_without_field_errors(user):
     other, created = register_ok()
     url = f"{BASE}/api/users/{created['id']}/follow"
-    assert requests.post(url, auth=user["auth"], timeout=10).status_code == 201
-    r = requests.post(url, auth=user["auth"], timeout=10)
+    assert user["session"].post(url).status_code == 201
+    r = user["session"].post(url)
     assert r.status_code == 409
     assert r.json()["message"] == "Already following"
     assert "fieldErrors" not in r.json()
 
 
 def test_like_twice_is_409_without_field_errors(user):
-    post = requests.post(f"{BASE}/api/posts", json={"mediaUrl": "https://example.com/p.jpg", "caption": "t263a"},
-                         auth=user["auth"], timeout=10)
+    post = user["session"].post(f"{BASE}/api/posts",
+                                json={"mediaUrl": "https://example.com/p.jpg", "caption": "t263a"})
     assert post.status_code == 201, post.text
     url = f"{BASE}/api/posts/{post.json()['postId']}/likes"
-    assert requests.post(url, auth=user["auth"], timeout=10).status_code == 201
-    r = requests.post(url, auth=user["auth"], timeout=10)
+    assert user["session"].post(url).status_code == 201
+    r = user["session"].post(url)
     assert r.status_code == 409
     assert r.json()["message"] == "Post already liked"
     assert "fieldErrors" not in r.json()
 
 
 def test_not_found_has_no_field_errors(user):
-    r = requests.get(f"{BASE}/api/users/t263a_nobody_{uid()}/profile", auth=user["auth"], timeout=10)
+    r = user["session"].get(f"{BASE}/api/users/t263a_nobody_{uid()}/profile")
     assert r.status_code == 404
     assert "fieldErrors" not in r.json()
 
 
 def test_update_email_to_taken_address_is_409_on_email(user):
     other, _ = register_ok()
-    r = requests.put(f"{BASE}/api/users/me/email", json={"email": other["email"]}, auth=user["auth"], timeout=10)
+    r = user["session"].put(f"{BASE}/api/users/me/email", json={"email": other["email"]})
     assert r.status_code == 409
     assert r.json()["fieldErrors"] == {"email": "Email already registered"}
 

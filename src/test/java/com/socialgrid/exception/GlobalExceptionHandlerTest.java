@@ -7,6 +7,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.http.MockHttpInputMessage;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -90,6 +91,18 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<ErrorResponse> res = handler.handleConflict(new ConflictException("Post already liked"));
 
         assertThat(res.getStatusCode().value()).isEqualTo(409);
+        assertThat(res.getBody().fieldErrors()).isNull();
+    }
+
+    // The exception's own text ("Bad credentials", or a hint about which check failed) is never echoed back.
+    @Test
+    void badCredentialsIs401WithFixedMessage() {
+        ResponseEntity<ErrorResponse> res = handler.handleBadCredentials(
+                new BadCredentialsException("user ghost not found"));
+
+        assertThat(res.getStatusCode().value()).isEqualTo(401);
+        assertThat(res.getBody().error()).isEqualTo("Unauthorized");
+        assertThat(res.getBody().message()).isEqualTo("Invalid username/email or password");
         assertThat(res.getBody().fieldErrors()).isNull();
     }
 

@@ -4,8 +4,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-# Vite bakes this into the JS at build time; the browser (on the host) calls the backend at this URL.
-ARG VITE_API_URL=http://localhost:8080
+# Vite bakes this into the JS at build time. Empty = call /api on the same origin; nginx proxies it.
+ARG VITE_API_URL=
 ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 

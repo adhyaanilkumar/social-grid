@@ -1,12 +1,12 @@
 import { useMutation } from '@tanstack/react-query'
 import { Check, CircleAlert, LoaderCircle } from 'lucide-react'
-import { useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { register } from '@/api/auth'
 import { ApiError } from '@/api/client'
+import { describedBy, Field } from '@/components/form-field'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { PasswordInput } from '@/components/ui/password-input'
 import { checkField, PASSWORD_MIN, REGISTER_FIELDS, type RegisterField } from '@/lib/registerRules'
 import { cn } from '@/lib/utils'
@@ -183,48 +183,6 @@ export default function Register() {
         </Link>
       </div>
     </main>
-  )
-}
-
-// Hint and error ids for aria-describedby, so screen readers read them along with the label.
-function describedBy(id: RegisterField, hasHint: boolean, error: string | undefined) {
-  return [hasHint && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(' ') || undefined
-}
-
-// Label above, hint under the label (or under the input when hintBelow), error under the input.
-function Field({
-  id,
-  label,
-  hint,
-  hintBelow = false,
-  error,
-  children,
-}: {
-  id: RegisterField
-  label: string
-  hint?: ReactNode
-  hintBelow?: boolean
-  error?: string
-  children: ReactNode
-}) {
-  const hintEl = hint && (
-    <p id={`${id}-hint`} className="text-sm text-muted-foreground">
-      {hint}
-    </p>
-  )
-  return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={id}>{label}</Label>
-      {!hintBelow && hintEl}
-      {children}
-      {hintBelow && hintEl}
-      {error && (
-        <p id={`${id}-error`} className="flex items-center gap-1.5 text-sm text-destructive">
-          <CircleAlert className="size-4 shrink-0" aria-hidden />
-          {error}
-        </p>
-      )}
-    </div>
   )
 }
 

@@ -36,8 +36,6 @@ services:
   frontend:
     build:
       context: ./frontend
-      args:
-        VITE_API_URL: http://localhost:8080
     container_name: social-grid-frontend
     ports:
       - "5173:80"

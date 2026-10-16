@@ -4,6 +4,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 import App from './App.tsx'
+import AuthProvider from './auth/AuthProvider'
 import { getTheme, setTheme } from './lib/theme'
 import './index.css'
 
@@ -18,9 +19,12 @@ createRoot(document.getElementById('root')!).render(
     {/* reducedMotion="user": animations are skipped for visitors whose OS asks for reduced motion. */}
     <MotionConfig reducedMotion="user">
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
+        {/* Inside the query client: it caches the "who is logged in" answer there. */}
+        <AuthProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </AuthProvider>
       </QueryClientProvider>
     </MotionConfig>
   </StrictMode>,

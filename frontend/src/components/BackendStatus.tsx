@@ -1,14 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { ApiError, apiFetch } from '@/api/client'
 
-// Proves the browser can reach the backend through CORS. There is no public GET endpoint yet,
-// so we call /api/auth/login without credentials: a 401 means "server reachable, not logged in".
-// A CORS block or a stopped server makes fetch itself fail, which shows up as "unreachable".
+// Proves the browser can reach the backend. There is no public GET endpoint, so we ask /api/auth/me:
+// 200 (logged in) or 401 (logged out) both mean "server reachable". With the backend stopped the proxy
+// answers 502/504 (or fetch fails outright), which shows up as "unreachable".
 async function checkBackend(): Promise<'reachable'> {
   try {
-    await apiFetch('/api/auth/login')
+    await apiFetch('/api/auth/me')
   } catch (e) {
-    if (!(e instanceof ApiError)) throw e
+    if (!(e instanceof ApiError) || e.status >= 500) throw e
   }
   return 'reachable'
 }

@@ -1,6 +1,7 @@
 package com.socialgrid.service.impl;
 
 import com.socialgrid.dto.EmailUpdateRequest;
+import com.socialgrid.dto.LoginRequest;
 import com.socialgrid.dto.ProfileResponse;
 import com.socialgrid.dto.ProfileUpdateRequest;
 import com.socialgrid.dto.RegisterRequest;
@@ -12,6 +13,9 @@ import com.socialgrid.exception.NotFoundException;
 import com.socialgrid.repository.ProfileRepository;
 import com.socialgrid.repository.UserRepository;
 import com.socialgrid.service.UserService;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,18 +26,27 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final ProfileRepository profileRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
 
     public UserServiceImpl(UserRepository userRepository,
                            ProfileRepository profileRepository,
-                           PasswordEncoder passwordEncoder) {
+                           PasswordEncoder passwordEncoder,
+                           AuthenticationManager authenticationManager) {
         this.userRepository = userRepository;
         this.profileRepository = profileRepository;
         this.passwordEncoder = passwordEncoder;
+        this.authenticationManager = authenticationManager;
+    }
+
+    @Override
+    public Authentication authenticate(LoginRequest request) {
+        return authenticationManager.authenticate(
+                UsernamePasswordAuthenticationToken.unauthenticated(request.identifier(), request.password()));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public UserResponse login(Integer userId) {
+    public UserResponse getUser(Integer userId) {
         return toResponse(findUser(userId));
     }
 
