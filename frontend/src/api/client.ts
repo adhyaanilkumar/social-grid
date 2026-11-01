@@ -39,9 +39,17 @@ interface RequestOptions {
   headers?: Record<string, string>
 }
 
+// Spring sets the CSRF cookie on its first response to us, usually the app's opening /api/auth/me. A form
+// submitted before that answer arrives would go without a token and get 403 (found in AD-246), so fetch the
+// cookie first. Any response sets it, even /me's 401 when logged out.
+async function ensureCsrfToken(): Promise<string | undefined> {
+  if (!csrfToken()) await fetch(`${API_URL}/api/auth/me`, { credentials: 'same-origin' }).catch(() => {})
+  return csrfToken()
+}
+
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, headers = {} } = options
-  const token = method === 'GET' ? undefined : csrfToken()
+  const token = method === 'GET' ? undefined : await ensureCsrfToken()
 
   const response = await fetch(`${API_URL}${path}`, {
     method,

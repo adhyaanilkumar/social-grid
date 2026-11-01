@@ -1,16 +1,20 @@
 import { expect, test, type Page } from '@playwright/test'
+import { execFileSync } from 'node:child_process'
 
-// End-to-end auth journeys (AD-246) against the REAL backend — no page.route mocks. The Vite dev server
+// End-to-end auth journeys (AD-246) against the REAL backend — no response mocks. The Vite dev server
 // (:5174) proxies /api to Spring on :8080, so this needs the backend running (e.g. `docker compose up -d`).
 // If it isn't reachable, every test here is skipped rather than failed.
+// E2E_BASE_URL=http://localhost:5173 runs the same tests through the Docker app's nginx instead of Vite.
 // The mocked edge cases (validation, pending states, CSRF header, ...) live in register.spec / login.spec.
 
 const PASSWORD = 'secret123'
 
-// Every run makes fresh users, prefixed so they're easy to spot (and clean up) in the dev database.
+// Every run makes fresh users; afterAll deletes them so the dev database doesn't fill up.
 let counter = 0
+const created: string[] = []
 function freshUser(project: string) {
   const name = `t246_${Date.now().toString(36)}${project[0]}${counter++}`
+  created.push(name)
   return { username: name, email: `${name}@example.com`, password: PASSWORD }
 }
 type User = ReturnType<typeof freshUser>
@@ -52,6 +56,23 @@ test.beforeAll(async ({ request }) => {
     .then((r) => r.status())
     .catch(() => 0)
   test.skip(status !== 401, 'real backend not reachable on :8080 — start it with `docker compose up -d`')
+})
+
+// Deletes the users this worker made, straight from Postgres (profiles first: their foreign key to users
+// doesn't cascade). Only its own names, never a t246_% pattern: desktop and mobile run in parallel workers,
+// and one finishing early mustn't delete the other's users mid-test. A failed cleanup only leaves rows
+// behind, so it warns instead of failing the run.
+test.afterAll(() => {
+  if (created.length === 0) return
+  const names = created.map((n) => `'${n}'`).join(',')
+  const sql =
+    `DELETE FROM profiles WHERE user_id IN (SELECT id FROM users WHERE username IN (${names}));` +
+    `DELETE FROM users WHERE username IN (${names});`
+  try {
+    execFileSync('docker', ['exec', 'social-grid-db', 'sh', '-c', `psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -qc "${sql}"`])
+  } catch (e) {
+    console.warn('AD-246 cleanup skipped:', (e as Error).message)
+  }
 })
 
 test('successful register lands on login with the username filled in', async ({ page }, info) => {
@@ -126,6 +147,8 @@ test('protected route redirects to login, then back to the page you wanted', asy
   const user = freshUser(info.project.name)
   await registerThroughApi(page, user)
 
+  // Start on a real page so Back has somewhere to go.
+  await page.goto('/')
   await page.goto('/home')
   await expect(page).toHaveURL('/login')
 
@@ -133,9 +156,23 @@ test('protected route redirects to login, then back to the page you wanted', asy
   await expect(page).toHaveURL('/home')
   await expect(welcome(page)).toHaveText(`Welcome, ${user.username}`)
 
-  // The redirect replaced /login in history, so Back doesn't return to the form.
+  // The redirect replaced /login in history, so Back skips the form and returns to where you started.
   await page.goBack()
-  await expect(page).not.toHaveURL('/login')
+  await expect(page).toHaveURL('/')
+})
+
+test('submitting before the CSRF cookie arrives still works', async ({ page }, info) => {
+  // Hold back the app's opening /api/auth/me (the call that brings the XSRF-TOKEN cookie), then submit at once.
+  // Before the fix the POST went without a token and got 403 "Something went wrong on our side".
+  await page.route('**/api/auth/me', async (route) => {
+    await new Promise((r) => setTimeout(r, 1500))
+    await route.continue()
+  })
+  const user = freshUser(info.project.name)
+  await registerThroughUi(page, user)
+
+  await expect(page).toHaveURL('/login', { timeout: 10_000 })
+  await expect(identifier(page)).toHaveValue(user.username)
 })
 
 test('logout ends the session: back to login, and /home is closed again', async ({ page }, info) => {
