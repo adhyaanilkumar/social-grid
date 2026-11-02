@@ -50,6 +50,9 @@ async function ensureCsrfToken(): Promise<string | undefined> {
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, headers = {} } = options
   const token = method === 'GET' ? undefined : await ensureCsrfToken()
+  // A file upload goes as is. The browser must set its Content-Type itself, because that header carries the
+  // "boundary" string separating the form's parts.
+  const isForm = body instanceof FormData
 
   const response = await fetch(`${API_URL}${path}`, {
     method,
@@ -57,11 +60,11 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     credentials: 'same-origin',
     headers: {
       Accept: 'application/json',
-      ...(body !== undefined && { 'Content-Type': 'application/json' }),
+      ...(body !== undefined && !isForm && { 'Content-Type': 'application/json' }),
       ...(token && { 'X-XSRF-TOKEN': token }),
       ...headers,
     },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: isForm ? body : body !== undefined ? JSON.stringify(body) : undefined,
   })
 
   if (!response.ok) {

@@ -1,12 +1,13 @@
 // Layout adapted from 21st.dev "Login Form" (socolled/login-form).
 // Changes: our logo, social-login buttons and "Reset password" link removed (we have neither yet),
 // username-or-email field, inline errors and alert matching the register page (AD-264).
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CircleAlert, LoaderCircle } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, type Location } from 'react-router'
 import { ApiError } from '@/api/client'
 import { useAuth } from '@/auth/auth-context'
+import { SESSION_EXPIRED } from '@/auth/session'
 import { describedBy, Field } from '@/components/form-field'
 import Logo from '@/components/landing/Logo'
 import { Button } from '@/components/ui/button'
@@ -34,6 +35,7 @@ export default function Login() {
   const navigate = useNavigate()
   const state = useLocation().state as LoginState | null
   const { login } = useAuth()
+  const sessionExpired = useQueryClient().getQueryData<boolean>(SESSION_EXPIRED)
 
   // Just signed up: their username is already filled in, so the cursor starts in the password field.
   const [values, setValues] = useState<Values>({ identifier: state?.username ?? '', password: '' })
@@ -51,6 +53,7 @@ export default function Login() {
 
   const mutation = useMutation({
     mutationFn: login,
+    meta: { ignoreSessionEnd: true },
     onSuccess: () => {
       const from = state?.from
       // replace: Back from the members page shouldn't land on the login form again.
@@ -109,6 +112,12 @@ export default function Login() {
           </Link>
         </p>
       </div>
+
+      {sessionExpired && (
+        <p role="status" className="rounded-lg border border-primary/40 bg-primary/10 p-3 text-sm">
+          Your session ended. Log in again.
+        </p>
+      )}
 
       {state?.registered && (
         <p role="status" className="rounded-lg border border-primary/40 bg-primary/10 p-3 text-sm">

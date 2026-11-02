@@ -4,7 +4,7 @@ import { Menu } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import Logo from '@/components/landing/Logo'
-import ThemeToggle from '@/components/landing/ThemeToggle'
+import ThemeToggle from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 

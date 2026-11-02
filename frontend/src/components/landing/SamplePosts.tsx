@@ -1,5 +1,6 @@
 // Built for social-grid (no 21st.dev component): example posts that show what using the app looks like.
 import { Heart, MessageCircle } from 'lucide-react'
+import Avatar from '@/components/Avatar'
 import { SAMPLE_POSTS } from '@/components/landing/content'
 import { Card, CardContent } from '@/components/ui/card'
 
@@ -19,15 +20,10 @@ export default function SamplePosts() {
             <li key={post.username}>
               <Card className="gap-0 overflow-hidden py-0">
                 <div className="flex items-center gap-2 px-4 py-3">
-                  <span
-                    aria-hidden
-                    className="grid size-8 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary uppercase"
-                  >
-                    {post.username[0]}
-                  </span>
+                  <Avatar username={post.username} />
                   <span className="text-sm font-semibold">@{post.username}</span>
                 </div>
-                <img src={post.src} alt={post.alt} width={400} height={400} loading="lazy" className="aspect-square w-full object-cover" />
+                <img src={post.src} alt={post.alt} width={400} height={400} loading="lazy" className="h-auto w-full" />
                 <CardContent className="space-y-2 p-4">
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <span className="inline-flex items-center gap-1">

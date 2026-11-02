@@ -3,8 +3,7 @@ import type { ReactNode } from 'react'
 import * as authApi from '@/api/auth'
 import { ApiError } from '@/api/client'
 import { AuthContext, type AuthState } from './auth-context'
-
-const ME = ['me']
+import { clearSession, ME, SESSION_EXPIRED } from './session'
 
 // A 401 isn't a failure here, it's the answer "nobody is logged in".
 async function fetchMe(): Promise<authApi.UserResponse | null> {
@@ -24,7 +23,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: ME,
     queryFn: fetchMe,
     retry: false,
-    // Only login and logout change the answer, and they update the cache themselves.
+    // Login, logout and an expired session change the answer, and they all update the cache themselves.
     staleTime: Infinity,
   })
 
@@ -35,12 +34,13 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     status: isPending ? 'loading' : user ? 'authed' : 'anon',
     login: async (request) => {
       const loggedIn = await authApi.login(request)
+      queryClient.removeQueries({ queryKey: SESSION_EXPIRED })
       queryClient.setQueryData(ME, loggedIn)
       return loggedIn
     },
     logout: async () => {
       await authApi.logout()
-      queryClient.setQueryData(ME, null)
+      clearSession(queryClient)
     },
   }
 

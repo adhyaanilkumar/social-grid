@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router'
 import { register } from '@/api/auth'
 import { ApiError } from '@/api/client'
 import { describedBy, Field } from '@/components/form-field'
+import Logo from '@/components/landing/Logo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/ui/password-input'
@@ -83,7 +84,10 @@ export default function Register() {
 
   return (
     <main className="mx-auto flex min-h-svh max-w-sm flex-col justify-center gap-8 px-4 py-16">
-      <h1 className="text-3xl font-semibold tracking-tight">Create account</h1>
+      <div>
+        <Logo />
+        <h1 className="mt-8 text-3xl font-semibold tracking-tight">Create account</h1>
+      </div>
 
       {/* noValidate: our own messages replace the browser's popups. */}
       <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-6">
