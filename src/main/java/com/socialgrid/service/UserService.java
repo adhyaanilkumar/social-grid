@@ -6,7 +6,10 @@ import com.socialgrid.dto.ProfileResponse;
 import com.socialgrid.dto.ProfileUpdateRequest;
 import com.socialgrid.dto.RegisterRequest;
 import com.socialgrid.dto.UserResponse;
+import com.socialgrid.dto.UserSummary;
 import org.springframework.security.core.Authentication;
+
+import java.util.List;
 
 public interface UserService {
 
@@ -21,5 +24,7 @@ public interface UserService {
 
     UserResponse updateEmail(Integer userId, EmailUpdateRequest request);
 
-    ProfileResponse getProfile(String username);
+    ProfileResponse getProfile(String username, Integer viewerId);
+
+    List<UserSummary> searchUsers(String query, Integer viewerId);
 }

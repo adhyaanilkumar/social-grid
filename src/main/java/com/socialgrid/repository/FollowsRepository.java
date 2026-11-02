@@ -5,4 +5,8 @@ import com.socialgrid.entity.Follows;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface FollowsRepository extends JpaRepository<Follows, FollowId> {
+
+    long countByIdFolloweeId(Integer followeeId);
+
+    long countByIdFollowerId(Integer followerId);
 }

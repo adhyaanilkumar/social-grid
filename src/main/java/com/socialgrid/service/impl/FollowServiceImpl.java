@@ -37,4 +37,14 @@ public class FollowServiceImpl implements FollowService {
         }
         return followsRepository.save(new Follows(id));
     }
+
+    @Override
+    @Transactional
+    public void unfollow(Integer followerId, Integer followeeId) {
+        FollowId id = new FollowId(followerId, followeeId);
+        if (!followsRepository.existsById(id)) {
+            throw new NotFoundException("Not following");
+        }
+        followsRepository.deleteById(id);
+    }
 }

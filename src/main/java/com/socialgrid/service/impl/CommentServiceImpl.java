@@ -3,10 +3,12 @@ package com.socialgrid.service.impl;
 import com.socialgrid.dto.CommentRequest;
 import com.socialgrid.dto.CommentResponse;
 import com.socialgrid.entity.Comment;
+import com.socialgrid.entity.User;
 import com.socialgrid.exception.ForbiddenException;
 import com.socialgrid.exception.NotFoundException;
 import com.socialgrid.repository.CommentRepository;
 import com.socialgrid.repository.PostRepository;
+import com.socialgrid.repository.UserRepository;
 import com.socialgrid.service.CommentService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,10 +20,13 @@ public class CommentServiceImpl implements CommentService {
 
     private final CommentRepository commentRepository;
     private final PostRepository postRepository;
+    private final UserRepository userRepository;
 
-    public CommentServiceImpl(CommentRepository commentRepository, PostRepository postRepository) {
+    public CommentServiceImpl(CommentRepository commentRepository, PostRepository postRepository,
+                              UserRepository userRepository) {
         this.commentRepository = commentRepository;
         this.postRepository = postRepository;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -49,9 +54,7 @@ public class CommentServiceImpl implements CommentService {
     @Transactional(readOnly = true)
     public List<CommentResponse> getCommentsForPost(Integer postId) {
         requirePost(postId);
-        return commentRepository.findByPostIdOrderByCommentIdAsc(postId).stream()
-                .map(this::toResponse)
-                .toList();
+        return commentRepository.findResponsesByPostId(postId);
     }
 
     private void requirePost(Integer postId) {
@@ -70,7 +73,10 @@ public class CommentServiceImpl implements CommentService {
     }
 
     private CommentResponse toResponse(Comment comment) {
-        return new CommentResponse(comment.getCommentId(), comment.getAuthorId(), comment.getPostId(),
-                comment.getMessage());
+        String authorUsername = userRepository.findById(comment.getAuthorId())
+                .map(User::getUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+        return new CommentResponse(comment.getCommentId(), comment.getAuthorId(), authorUsername,
+                comment.getPostId(), comment.getMessage());
     }
 }

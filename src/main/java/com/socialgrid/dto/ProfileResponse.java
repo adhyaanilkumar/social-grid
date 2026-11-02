@@ -6,5 +6,9 @@ public record ProfileResponse(
         String firstName,
         String lastName,
         String bio,
-        String profilePicUrl) {
+        String profilePicUrl,
+        long postCount,
+        long followerCount,
+        long followingCount,
+        boolean followedByMe) {
 }

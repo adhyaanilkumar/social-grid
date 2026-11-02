@@ -11,12 +11,16 @@ export const PASSWORD_MIN = 8
 // Loose on purpose, like the backend's @Email: something@something, no spaces.
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+$/
 
+// Profile URLs contain the username, so characters like / would make a profile unreachable.
+const USERNAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
+
 // Returns the error message for a field, or undefined when the value is fine.
 export function checkField(field: RegisterField, value: string): string | undefined {
   switch (field) {
     case 'username':
       if (value.trim() === '') return 'Username is required'
       if (value.length < 3 || value.length > 30) return 'Username must be 3–30 characters'
+      if (!USERNAME_PATTERN.test(value)) return 'Username can only use letters, numbers, dots, dashes and underscores'
       return undefined
     case 'email':
       if (value.trim() === '') return 'Email is required'

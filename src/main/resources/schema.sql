@@ -10,3 +10,8 @@ ALTER TABLE comments ADD CONSTRAINT fk_comments_post
 ALTER TABLE likes DROP CONSTRAINT IF EXISTS fk_likes_post;
 ALTER TABLE likes ADD CONSTRAINT fk_likes_post
     FOREIGN KEY (post_id) REFERENCES posts (post_id) ON DELETE CASCADE;
+
+-- A post's photo goes when the post goes.
+ALTER TABLE post_images DROP CONSTRAINT IF EXISTS fk_post_images_post;
+ALTER TABLE post_images ADD CONSTRAINT fk_post_images_post
+    FOREIGN KEY (post_id) REFERENCES posts (post_id) ON DELETE CASCADE;

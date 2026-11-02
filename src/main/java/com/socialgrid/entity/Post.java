@@ -23,13 +23,20 @@ public class Post {
     @Column(length = 2200)
     private String caption;
 
+    // The stored photo's size, so the page can reserve its space before it loads.
+    // Nullable because posts made before photo upload don't have one.
+    private Integer width;
+
+    private Integer height;
+
     protected Post() {
     }
 
-    public Post(Integer authorId, String mediaUrl, String caption) {
+    public Post(Integer authorId, String caption, Integer width, Integer height) {
         this.authorId = authorId;
-        this.mediaUrl = mediaUrl;
         this.caption = caption;
+        this.width = width;
+        this.height = height;
     }
 
     public Integer getPostId() {
