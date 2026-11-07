@@ -38,10 +38,22 @@ jobs:
         with:
           fetch-depth: 1
 
+      # So Claude can run the backend tests before pushing (the TDD loop needs a test to see fail, then pass).
+      # Testcontainers uses the runner's Docker. Without this, a fix on scratch PR #4 was pushed untested and broke
+      # 2 unit tests that only ci caught (deploy-plan.md B6).
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # CLAUDE.md applies here as on the laptop: fix the code, not the test; never push to main.
+          # The system prompt adds the Deploy-stage bug rule, so a fix pushed from a PR comment follows the TDD loop.
           claude_args: >-
+            --append-system-prompt "When asked to fix a bug, follow the TDD loop in CLAUDE.md: first add or restore a test that fails because of the bug (red), then fix the code so it passes without changing that test (green), then tidy up (refactor). Never weaken, skip or delete a test to make it pass. Before every push of Java changes, run the affected test classes with mvn -q test -Dtest=<Classes> and show the result; if you can't make them pass, push nothing and explain. Say in your reply which test proves the fix. The full suites run in the ci check on your push."
             --model claude-sonnet-5-5
             --max-turns 40
+            --allowedTools "Bash(mvn -q test:*),Bash(mvn test:*)"

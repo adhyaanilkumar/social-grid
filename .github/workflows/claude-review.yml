@@ -11,10 +11,6 @@ on:
   issue_comment:
     types: [created]
 
-concurrency:
-  group: claude-review-${{ github.event.pull_request.number || github.event.issue.number }}
-  cancel-in-progress: true
-
 jobs:
   review:
     # Skip drafts and PRs from forks (forks don't get secrets anyway). Re-reviews on request only from the owner,
@@ -27,6 +23,12 @@ jobs:
         && github.event.issue.pull_request
         && github.actor == 'adhyaanilkumar'
         && contains(github.event.comment.body, '@claude review'))
+    # Job-level, not workflow-level: Claude's own review comment starts another run of this workflow, which skips
+    # itself (the if above). At workflow level that skipped run cancelled the finishing review (PR #4, 10:48).
+    # A skipped job never joins the group, so only real reviews replace each other.
+    concurrency:
+      group: claude-review-${{ github.event.pull_request.number || github.event.issue.number }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
