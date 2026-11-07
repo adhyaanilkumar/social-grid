@@ -53,11 +53,21 @@ def mvn_test(repo, test_classes):
     text = (run.stdout + run.stderr).splitlines()
     if run.returncode == 0:
         return True, "passed"
-    # The first real error: a failing test, a compile error, or a crash. Not Maven's "[Help 1]" footer.
-    errors = [l.strip() for l in text if re.search(r"Tests run:.*(Failures: [1-9]|Errors: [1-9])|<<< (FAIL|ERR)|"
-                                                    r"COMPILATION ERROR|\.java:\[\d+|Exception", l)
-              and "Help 1" not in l]
-    return False, (" / ".join(errors[:2]) if errors else f"mvn exit {run.returncode}")[:300]
+    return False, failure_reason(text, run.returncode)
+
+
+def failure_reason(lines, exit_code=1):
+    """What failed, in order of usefulness: failing tests, then compile errors, then a crash. Ordinary log lines
+    (WARN, INFO, DEBUG) are skipped, since one can mention "Exception" and hide the real failure (deploy bug B8)."""
+    lines = [l.strip() for l in lines if not re.search(r"\s(WARN|INFO|DEBUG)\s", l) and "Help 1" not in l]
+    tiers = [r"Tests run:.*(Failures: [1-9]|Errors: [1-9])|<<< (FAIL|ERR)",
+             r"COMPILATION ERROR|\.java:\[\d+",
+             r"Exception|Error:"]
+    for pattern in tiers:
+        found = [l for l in lines if re.search(pattern, l)]
+        if found:
+            return " / ".join(found[:2])[:300]
+    return f"mvn exit {exit_code}"
 
 
 def transcript_commands(transcript):

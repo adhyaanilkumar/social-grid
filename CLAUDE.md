@@ -46,8 +46,8 @@ Never skip, weaken or delete a failing test.
 - Windows PowerShell 5.1 breaks quoted arguments to git. Write commit messages to a file and use `git commit -F <file>`.
 - In PowerShell, quote `"@journey"`. Unquoted, it's read as a variable.
 - Never rebuild or restart Docker while another test suite is using it.
-- In Claude's sandbox the test JVM can't write to `target/`. Set `MAVEN_ARGS=-DargLine=-Djava.io.tmpdir=<scratchpad>`.
-- Don't run `make` from Git Bash inside the sandbox (Maven fails to start). Use PowerShell.
+- Only on the owner's Windows laptop, inside Claude's sandbox: the test JVM can't write to `target/`, so set `MAVEN_ARGS=-DargLine=-Djava.io.tmpdir=<scratchpad>`. Never in CI or the evals (Linux, no sandbox): there, run `mvn -q test -Dtest=<Classes>` as it is.
+- On that laptop, don't run `make` from Git Bash inside the sandbox (Maven fails to start). Use PowerShell.
 - Run `make test` in the foreground (it takes about 6 minutes). The PR hook runs when a command returns, and a background command returns as soon as it starts, so the hook never sees the pass.
 - Claude Code file permission rules are `Edit(path)`, which also covers Write; `Write(path)` never matches. A path outside the working directory also needs `--add-dir`. `//` starts an absolute path.
 - If PowerShell says `make` isn't recognized, add MSYS2 for that command: `$env:Path += ";C:\msys64\usr\bin"`.

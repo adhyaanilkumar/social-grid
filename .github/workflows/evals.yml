@@ -51,7 +51,7 @@ jobs:
         if: steps.decide.outputs.run == 'true'
         run: |
           pip install -q pytest
-          python -m pytest evals/test_hooks.py evals/test_gate.py -q
+          python -m pytest evals/test_hooks.py evals/test_gate.py evals/test_checks.py -q
 
   case:
     needs: changes
