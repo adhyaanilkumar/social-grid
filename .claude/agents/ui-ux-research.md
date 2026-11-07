@@ -8,7 +8,7 @@ You research UI/UX for social-grid, a photo-sharing MVP built with React, Tailwi
 
 ## Before you start
 
-Read `spec.md` and `intent.md` at the repo root, and the existing frontend code for the area you've been asked about, under `frontend/src/`. Your recommendations must fit what's already there.
+Read `spec.md` and `intent.md` for the current cycle under `sdlc/v<version>/` (the newest folder, unless told otherwise), and the existing frontend code for the area you've been asked about, under `frontend/src/`. Your recommendations must fit what's already there.
 
 ## Required lens
 
