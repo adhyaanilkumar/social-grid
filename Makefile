@@ -18,22 +18,46 @@ else
 endif
 PYTHON ?= python
 
+# Pass stamps: build, lint and test each record the commit they passed on in .git/checks/<name>.
+# .claude/hooks/merge_when_green.py merges to main only when all three match the current commit.
+# A run with uncommitted changes to these paths records "dirty", because what passed isn't what would be merged.
+CODE_PATHS := src frontend tests pom.xml Makefile docker-compose.yml Dockerfile
+CHECKS_DIR = $$(git rev-parse --git-dir)/checks
+define clear_pass
+	@mkdir -p "$(CHECKS_DIR)" && rm -f "$(CHECKS_DIR)/$(1)"
+endef
+define record_pass
+	@if [ -z "$$(git status --porcelain -- $(CODE_PATHS) ':!**/__pycache__/**')" ]; then \
+		git rev-parse HEAD > "$(CHECKS_DIR)/$(1)"; \
+	else \
+		echo dirty > "$(CHECKS_DIR)/$(1)"; \
+		echo "Note: uncommitted code changes, so this pass can't trigger the merge to main. Commit, then re-run."; \
+	fi
+endef
+
 .PHONY: build lint test test-white test-black test-ui test-journey stack-up
 
 # Compiles test code too (-DskipTests skips running tests, not compiling them).
 build:
+	$(call clear_pass,build)
 	$(MVN) -q -DskipTests package
 	cd frontend && $(NPM) run build
 	docker compose build
+	$(call record_pass,build)
 	@echo "Build succeeded"
 
 # Treats Java compiler warnings and oxlint warnings as failures.
 lint:
+	$(call clear_pass,lint)
 	$(MVN) -q -Plint clean test-compile
 	cd frontend && $(NPX) oxlint --deny-warnings
+	$(call record_pass,lint)
 	@echo "Lint succeeded"
 
-test: test-white test-black test-ui
+test:
+	$(call clear_pass,test)
+	$(MAKE) test-white test-black test-ui
+	$(call record_pass,test)
 	@echo "All tests passed"
 
 # JUnit starts its own throwaway Postgres through Testcontainers, so it doesn't need the stack.
