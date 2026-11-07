@@ -243,6 +243,19 @@ Each milestone ends with my review stop, then one commit on branch `v0-deploy`. 
 4. **Rollback drill:** release a harmless second commit, roll back with one command, check that the site still works and that the earlier tag is running, then release forward again.
 5. The browser shows a valid certificate, and the session cookie is `Secure; HttpOnly; SameSite=Lax`.
 
+**D6 results (2026-11-07):**
+1. **Passed.** Release run 42389037205 released `04f403a`, approved by the owner. Every step passed, including the outside check (`/` 200, `/api/auth/me` 401). Memory afterwards: backend 318 MB of 900, Postgres 53 of 400, Caddy 16 of 128, nginx 7 of 64 (K1 holds for now).
+2. **Passed.** The journey, run with the command above, passed in 25 s (1 passed) on `https://social-grid.dev`, the backend restart included. `DOCKER_HOST` was cleared straight after it.
+3. Waiting for the owner: a photo from a phone.
+4. Next: this PR is the harmless second commit. After it merges: release it, roll back to `04f403a`, check, release it again.
+5. **Passed.** Certificate: Let's Encrypt (YE2), `CN=social-grid.dev`, valid 7 Nov 2026 to 5 Feb 2027, renewed by Caddy. `JSESSIONID ... Secure; HttpOnly; SameSite=Lax`, `XSRF-TOKEN ... Secure`, and HSTS `max-age=31536000; includeSubDomains`.
+
+`remove-user.sh` was missing from the D6 merge, so it's added in this PR, and `release.yml` now copies it to the server. A laptop rehearsal ran against a throwaway Postgres with the app's schema and a fixture covering every relation:
+- bad name → exit 2; unknown user → exit 1; wrong or empty confirmation → nothing deleted;
+- confirmed → the user, their profile, posts, photos, likes, comments and follows are gone, plus others' likes and comments on their posts. Another user, `alice.x`, is untouched;
+- a failure forced halfway (a trigger) → nothing deleted, because it's one transaction;
+- the backup restores everything with `pg_restore --clean`.
+
 ## 3b. Bugs found during Deploy
 
 Owner's rule, 2026-11-07: a bug found in this stage goes back through Stage 4's TDD loop. That applies whoever finds it: Claude's review, CI, a rehearsal, or production.

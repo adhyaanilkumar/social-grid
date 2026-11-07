@@ -67,7 +67,7 @@ jobs:
           printf 'Host deploy-target\n  HostName %s\n  User deploy\n  StrictHostKeyChecking yes\n  BatchMode yes\n' "$HOST" > ~/.ssh/config
 
       - name: Copy the deploy files
-        run: scp deploy/compose.prod.yml deploy/Caddyfile deploy/release.sh deploy/rollback.sh deploy-target:/opt/social-grid/
+        run: scp deploy/compose.prod.yml deploy/Caddyfile deploy/release.sh deploy/rollback.sh deploy/remove-user.sh deploy-target:/opt/social-grid/
 
       - name: Release ${{ inputs.tag }}
         run: ssh deploy-target "bash /opt/social-grid/release.sh '$TAG'"
