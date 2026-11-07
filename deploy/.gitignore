@@ -1,0 +1,4 @@
+# Server-only files: secrets, the record of the previous release, and database backups.
+.env
+previous-tag
+backups/

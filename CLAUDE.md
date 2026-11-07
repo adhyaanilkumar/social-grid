@@ -47,3 +47,4 @@ Never skip, weaken or delete a failing test.
 - Never rebuild or restart Docker while another test suite is using it.
 - In Claude's sandbox the test JVM can't write to `target/`. Set `MAVEN_ARGS=-DargLine=-Djava.io.tmpdir=<scratchpad>`.
 - Don't run `make` from Git Bash inside the sandbox (Maven fails to start). Use PowerShell.
+- If PowerShell says `make` isn't recognized, add MSYS2 for that command: `$env:Path += ";C:\msys64\usr\bin"`.

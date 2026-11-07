@@ -1,0 +1,92 @@
+# Production stack for the server (spec section 8, sdlc/v0/deploy-plan.md D1). Lives in /opt/social-grid next to
+# .env, the Caddyfile and the scripts. Run it through release.sh rather than by hand.
+#
+#   Internet -443-> caddy (HTTPS) -> frontend nginx -/api/-> backend (Spring) -> postgres
+#
+# Differences from the local docker-compose.yml:
+# - Images come from GHCR, pinned to a commit SHA (TAG in .env), so a rollback is "run the previous tag".
+# - Only Caddy publishes ports. Postgres and Spring are reachable only inside Docker's private network.
+# - Real secrets come from .env, which never leaves the server.
+# - Memory caps keep everything inside a 2 GB machine.
+#
+# Container names match docker-compose.yml, so the journey test's docker commands work against the server too (D6).
+name: social-grid
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: social-grid-db
+    environment:
+      POSTGRES_DB: socialgrid
+      POSTGRES_USER: ${DB_USER:?set DB_USER in .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d socialgrid"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    mem_limit: 400m
+    restart: unless-stopped
+
+  backend:
+    image: ghcr.io/adhyaanilkumar/social-grid-backend:${TAG:?set TAG in .env}
+    container_name: social-grid-backend
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/socialgrid
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      CORS_ALLOWED_ORIGINS: https://${DOMAIN:?set DOMAIN in .env}
+      COOKIE_SECURE: "true"
+      SHOW_SQL: "false"
+      # 75% of the 900 MB container limit for the heap, leaving room for the JVM's own memory.
+      JAVA_OPTS: -XX:MaxRAMPercentage=75
+    # Up means a logged-out GET /api/auth/me answers 401, the same signal tests/wait_for_stack.py uses.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/auth/me | grep -q 401"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    mem_limit: 900m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/adhyaanilkumar/social-grid-frontend:${TAG}
+    container_name: social-grid-frontend
+    environment:
+      # Login and register: 10 a minute per visitor, plus a burst of 5 (frontend/nginx.conf).
+      AUTH_RATE_LIMIT: 10r/m
+      AUTH_RATE_BURST: "5"
+    mem_limit: 64m
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: social-grid-caddy
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"      # Let's Encrypt's check, then redirects to HTTPS
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data   # certificates; keeping them avoids hitting Let's Encrypt limits on every restart
+      - caddy_config:/config
+    mem_limit: 128m
+    depends_on:
+      - frontend
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

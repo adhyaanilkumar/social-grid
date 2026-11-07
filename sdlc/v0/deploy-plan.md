@@ -75,7 +75,7 @@ Each milestone ends with my review stop, then one commit on branch `v0-deploy`. 
 | `application.properties` | `server.forward-headers-strategy=native` | Spring trusts `X-Forwarded-Proto` from the proxy. (spec 8.3) |
 | `application.properties` | `spring.jpa.show-sql=${SHOW_SQL:true}` | Production sets it to false, so every SQL query isn't written to the logs. The default stays `true` so local behaviour doesn't change. |
 | `frontend/nginx.conf` | `limit_req` on `/api/auth/login` and `/api/auth/register`: about 10 requests a minute per IP address, with a small burst allowance, and 429 when the limit is hit. Caddy passes on the visitor's real IP address, so the limit applies per visitor rather than to Caddy as one client. | The link will be public (P3). Each login runs BCrypt, which is deliberately slow, so a script could otherwise max out the CPU (spec R2). |
-| `frontend/nginx.conf` | Pass `X-Forwarded-Proto` through: Caddy's value if present, otherwise nginx's own `$scheme` | Locally there's no Caddy, so `$scheme` (http) is still correct there. |
+| `frontend/nginx.conf` | Pass Caddy's `X-Forwarded-Proto` through, and **send nothing when it's missing** (local Docker). Also pass the visitor's address in `X-Forwarded-For`. The file becomes a template, so the image fills in the rate limits from environment variables. | **Changed during D1:** the plan said to fall back to nginx's `$scheme`. But a forwarded `http` makes Tomcat assume port 80, not `localhost:5173`. Spring would then treat local requests as cross-origin, and `CorsConfig` rejects their `X-XSRF-TOKEN` header with 403 (the AD-246 failure). Without the header, local requests are handled exactly as before. |
 | `Dockerfile` | `ENTRYPOINT` honours `JAVA_OPTS`, and production sets `-XX:MaxRAMPercentage=75` | Without a cap, the JVM sizes its heap from the whole machine's RAM and can starve Postgres. |
 | `deploy/compose.prod.yml` (new) | Postgres, backend and frontend using GHCR images by tag, plus Caddy. No published database or API ports. Memory limits: backend 900 MB, Postgres 400 MB. `restart: unless-stopped`. A backend healthcheck on `/api/auth/me` returning 401, the same signal `tests/wait_for_stack.py` already uses. | The production version of `docker-compose.yml`. The local file stays as it is. |
 | `deploy/Caddyfile` (new) | `{$DOMAIN} { reverse_proxy frontend:80 }` | Caddy fetches the certificate for whatever domain `.env` names. |
@@ -87,6 +87,16 @@ Each milestone ends with my review stop, then one commit on branch `v0-deploy`. 
 **One change to spec 8.3:** the item "nginx's backend address comes from an environment variable" is no longer needed. Production still runs Compose, so the name `backend` resolves the same way it does locally.
 
 **Proof:** `make build`, `make lint` and `make test` all pass, which shows nothing local broke. I also run `deploy/compose.prod.yml` on this laptop with locally built images and Caddy's self-signed localhost certificate. On `https://localhost`, I log in, upload a photo, and check that the cookie has the `Secure` flag.
+
+**D1 result (2026-11-07):**
+- **Checks:** `Build succeeded`, `Lint succeeded`, `All tests passed`. JUnit 355, pytest 262, Playwright 598 passed with 20 skipped by design. These are the same counts as V0.
+- **Rehearsal:** `compose.prod.yml` ran at `https://localhost` under its own project name (`sg-rehearsal`), so its database volume couldn't be the dev one. The first user got `id: 1`, which shows it started empty.
+  - Register and login work with CSRF over HTTPS, so risk K3 is resolved.
+  - The cookie is `Secure; HttpOnly; SameSite=Lax`.
+  - A photo uploads and loads back as JPEG, and the session survives a reload.
+  - Login answered `429` after 6 requests (1 plus a burst of 5).
+- **Release and rollback:** `release.sh` released `aaaaaaa`, then `bbbbbbb` (backing up the database first), and `rollback.sh` brought back `aaaaaaa`. The data survived, and the backup file lists all 7 tables.
+- **Added during D1:** `REHEARSAL=1` in `release.sh`. It skips the pull, accepts Caddy's localhost certificate, and skips the image prune, which on a laptop would delete other projects' images. Production never sets it. `deploy/.gitattributes` keeps Unix line endings, because `core.autocrlf` would otherwise give the scripts Windows line endings and break them on Linux. The Makefile counts `deploy/` as code.
 
 ### D2. CI on GitHub Actions
 
