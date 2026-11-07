@@ -28,6 +28,11 @@ Run three passes, and tag each finding with its pass: **[Bugs]**, **[Security]**
     PR, and the reason must be the spec, not "the code does this now";
   - anything that costs money states its monthly INR cost and has the owner's approval.
 
+## Bug fixes need a failing test first
+A PR that fixes a bug, including one pushed by `@claude`, must include a test that fails without the fix and passes
+with it (CLAUDE.md, Stage 4's TDD loop). If a bug fix has no such test, that's an **Important [Compliance]** finding.
+For each Important [Bugs] finding, also name the test that would catch it.
+
 ## What Important means here
 **Important** is reserved for findings that would break behaviour, lose or leak data, weaken security, or break a
 rule above. Everything else is a **Nit**: naming, style, comments, small simplifications.

@@ -124,9 +124,23 @@ Each milestone ends with my review stop, then one commit on branch `v0-deploy`. 
 | One-time setup | **Changed in D3:** you install the Claude GitHub App from its page (https://github.com/apps/claude, for this repo only), run `claude setup-token`, and store the token with `gh secret set CLAUDE_CODE_OAUTH_TOKEN` in your own terminal, so it never passes through this chat. This replaces `/install-github-app`, which also opens its own PR of workflow files that would clash with these. |
 | `CLAUDE.md` | Stage 5 line: "Claude reviews each PR against `REVIEW.md`. When a review flags the same mistake twice, the fix goes into `Things Claude gets wrong`." This feeds what review finds back into Claude's setup, as the playbook describes. |
 
-**Note:** GitHub runs comment-triggered workflows (`issue_comment`) only from `main`. So `@claude review` and the fix loop start working only after D3 is merged. The automatic review on `pull_request` runs on the D3 PR itself.
+**Note:** GitHub runs comment-triggered workflows (`issue_comment`) only from `main`. So `@claude review` and the fix loop start working only after D3 is merged. **Corrected in D3:** the review doesn't run on the D3 PR either. `claude-code-action` refuses to run while a PR changes its own workflow file compared with `main`, so that a PR can't edit the workflow to leak the token. Every workflow change is proven on a later PR.
 
 **Proof:** on the D3 PR itself, Claude posts a review that follows `REVIEW.md` (findings tagged by pass, at most 5 Nits). Then I test the policy by pushing a throwaway commit to a scratch PR that removes a test assertion and uses string-built SQL. The review must flag both as Important. Finally, a `@claude` comment from you adds a fix commit, and `ci` re-runs on it. Then the scratch PR is closed.
+
+**D3 result (2026-11-07):**
+- **The review works.** On scratch PR #4 (string-built search SQL plus weakened `%` and `_` assertions), `@claude review` posted one comment with **3 Important findings**: SQL injection with working payloads, `%` and `_` acting as wildcards, and weakened tests (citing the CLAUDE.md rule). It also gave 3 Nits, within the cap, and ignored the "scratch, don't merge" note when deciding what to report. One run rated "skips the Repository layer" Important and another rated it a Nit, so borderline severity varies between runs.
+- **The fix loop works.** `@claude please fix the SQL injection and wildcard escaping, and restore the two test assertions` led `claude[bot]` to push `4aa6843`: bound parameters plus an `escapeLike` with `ESCAPE '\'`, and the test file back exactly as on `main`.
+- **The fix wasn't complete:** the bot pushed without running tests, and `ci` failed with 2 unit-test errors (B6). The review's own warning about field injection was right.
+- **K9 is resolved.** `ci` started on the bot's push automatically, because the app's pushes trigger workflows.
+- **It took three fixes to get the review posting** (PRs #5, #6, #7). The run summary (`display_report`) showed the cause each time:
+  1. The comment command didn't match the allow-list.
+  2. `/tmp` was outside the working directory, so `--add-dir /tmp` was added.
+  3. `Write(...)` permission rules never match; file rules are written `Edit(...)`. This was tested locally with `claude -p` and is now in CLAUDE.md.
+- **Found during D3:**
+  - Claude's own review comment started another run of the workflow. With workflow-level `concurrency`, that run cancelled the finishing review, so the PR showed "cancelled". Concurrency is now set per job, so skipped runs don't join the group.
+  - A comment posted *before* a workflow fix is merged runs the old workflow.
+- **Added 2026-11-07 at the owner's request:** bugs found during Deploy go through the TDD loop. See "Bugs found during Deploy" below, CLAUDE.md Stage 5, REVIEW.md, and the fix loop's system prompt in `claude.yml`.
 
 ### D4. Evals in CI
 
@@ -178,6 +192,27 @@ Each milestone ends with my review stop, then one commit on branch `v0-deploy`. 
 3. A real photo uploaded from your phone (spec R9; Playwright here can't test Safari or HEIC).
 4. **Rollback drill:** release a harmless second commit, roll back with one command, check that the site still works and that the earlier tag is running, then release forward again.
 5. The browser shows a valid certificate, and the session cookie is `Secure; HttpOnly; SameSite=Lax`.
+
+## 3b. Bugs found during Deploy
+
+Owner's rule, 2026-11-07: a bug found in this stage goes back through Stage 4's TDD loop. That applies whoever finds it: Claude's review, CI, a rehearsal, or production.
+
+1. **Red:** add or restore a test that fails because of the bug. Run it and watch it fail for the right reason.
+2. **Green:** fix the code until that test passes. Never change the test to fit the code.
+3. **Refactor:** tidy up while it stays green, then run all suites (`make build`, `make lint`, `make test`).
+
+There are at most **3 rounds per group** (backend, frontend). After that, stop and hand over with what was tried and the likely cause. Each bug is logged here.
+
+Workflow and configuration mistakes (the review-posting fixes in D3) have no unit test to write first. Their red and green is a live run that fails and then passes, with the run ID recorded.
+
+| # | Found | Bug | Group | Red (failing test) | Status |
+|---|---|---|---|---|---|
+| B1 | D3 local `make test`, 2026-11-07 | `composer.spec.ts:296` on mobile ("new post at the top of Home and Explore") failed once and then passed 20 out of 20 times alone. Likely cause: `revealPost` in `e2e/helpers.ts` gives up before the Explore feed's first page has loaded, so it never pages to the post. A test-helper bug, not app code. | frontend tests | To write: reproduce by delaying the feed response (route mock) so the post sits on page 2 | **Open.** Next to be fixed through the loop. |
+| B2 | D3, review run 42357444834 | Review posted nothing: the comment command didn't match the allow-list | CI config | Live run: no comment | Fixed in PR #5 |
+| B3 | D3, run 42359515432 | Writing `/tmp/review.md` was denied: outside the working directory | CI config | Live run: denied | Fixed in PR #6 (`--add-dir /tmp`) |
+| B4 | D3, run 42363156323 | Still denied: a `Write(...)` rule never matches | CI config | Local `claude -p`: `Write(...)` denied, `Edit(...)` allowed | Fixed in PR #7; run 42365446001 posted the review |
+| B5 | D3, run 42365446001 | Review shows "cancelled": its own comment started a run that cancelled it | CI config | Live run: cancelled | Fixed in this commit (per-job concurrency); confirm on the next review |
+| B6 | D3, ci run on `4aa6843` | The `@claude` fix pushed after 28 s **without running any test**. Its field-injected `JdbcTemplate` is null when unit tests build `new UserServiceImpl(...)`, so 2 tests in `UserServiceImplTest` hit a NullPointerException. The review had warned about this. `ci` caught it, and branch protection would block the merge. The security fix itself passed (`UserSearchIntegrationTest` 10 out of 10). | CI config | Live run: ci failed with 2 errors | Fixed in this commit: the fix loop gets Java 21 and `mvn test`, and must run the affected tests before pushing. Scratch PR #4 is closed unmerged. |
 
 ## 4. Risks
 
