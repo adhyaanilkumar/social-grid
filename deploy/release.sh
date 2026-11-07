@@ -63,7 +63,13 @@ fi
 # 5. Through Caddy, as a browser would: a logged-out /api/auth/me must answer 401.
 insecure=""
 [ "$rehearsal" = "1" ] && insecure="--insecure"
-status="$(curl -s $insecure -o /dev/null -w '%{http_code}' --resolve "${domain}:443:127.0.0.1" "https://${domain}/api/auth/me" || true)"
+# Retry for up to 90 s: on the first release Caddy still has to get the certificate from Let's Encrypt.
+status=""
+for _ in $(seq 1 18); do
+  status="$(curl -s $insecure -o /dev/null -w '%{http_code}' --resolve "${domain}:443:127.0.0.1" "https://${domain}/api/auth/me" || true)"
+  [ "$status" = "401" ] && break
+  sleep 5
+done
 if [ "$status" != "401" ]; then
   echo "Containers are healthy, but https://${domain}/api/auth/me answered '${status}', not 401." >&2
   echo "To go back to ${current:-the previous tag}: ./rollback.sh" >&2
