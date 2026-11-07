@@ -42,7 +42,9 @@ def changed_tests(repo, since):
 
 def mvn_test(repo, test_classes):
     """Runs the given JUnit classes. Returns (passed, last useful output line)."""
-    cmd = [tool("mvn"), "-q", "test", f"-Dtest={','.join(test_classes)}", "-Dsurefire.failIfNoSpecifiedTests=false"]
+    # No -Dsurefire.failIfNoSpecifiedTests=false: if a named class doesn't exist (renamed, deleted), Maven must fail
+    # rather than report success with 0 tests run.
+    cmd = [tool("mvn"), "-q", "test", f"-Dtest={','.join(test_classes)}"]
     extra = os.environ.get("MAVEN_ARGS")  # the laptop's sandbox needs a different temp dir (CLAUDE.md)
     env = {**os.environ}
     if extra:

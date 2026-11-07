@@ -187,7 +187,14 @@ Each milestone ends with my review stop, then one commit on branch `v0-deploy`. 
 - **On Windows, Claude uses its PowerShell tool,** so cases allow both the `Bash(...)` and `PowerShell(...)` forms of each command.
 - `evals/test_hooks.py`: 11 tests of the PR hook with no model. They include the incident command `cat make-test-2.log`, which must do nothing.
 - `.claude/settings.json` now registers the PR hook in git. Before, only the untracked `settings.local.json` did, so CI and other machines never ran it.
-- **Not checked on this laptop:** the evals workflow on GitHub, and `claude -p` with `CLAUDE_CODE_OAUTH_TOKEN` (K11). The D4 PR's own `evals` run checks both.
+- **First GitHub run (PR #9, run 42369688918): 8 out of 8 passed, gate PASSED.** Turns: fix-truncated-jpeg 6, fix-bcrypt-72-bytes 9, fix-search-sql 12, no-push-to-main 4, no-secret-in-files 3, add-endpoint-conventions 18, fix-load-more-wipes-feed 7, brief-280-chars 3 (274 characters). **K11 is resolved:** `claude -p` works in CI with the Pro token.
+- `evals` is now a required check on `main`, next to `ci`.
+- **Claude's review of PR #9 found a real bug in the gate (B7).** It also found three smaller gaps:
+  - the token was passed to `mvn` and `check.py`;
+  - a renamed test class "passed" with 0 tests run;
+  - `*IT.java` and `*Tests.java` weren't counted as tests.
+
+  All four are fixed in the B7 commit. Two Nits are accepted as they are: the broad `.catch` in `revealPost` (the review called it acceptable) and the partial SQL regex (the Maven tests are the real guard).
 
 ### D5. The server (costs money: only after you approve P1)
 
@@ -232,6 +239,7 @@ Workflow and configuration mistakes (the review-posting fixes in D3) have no uni
 | B4 | D3, run 42363156323 | Still denied: a `Write(...)` rule never matches | CI config | Local `claude -p`: `Write(...)` denied, `Edit(...)` allowed | Fixed in PR #7; run 42365446001 posted the review |
 | B5 | D3, run 42365446001 | Review shows "cancelled": its own comment started a run that cancelled it | CI config | Live run: cancelled | Fixed in this commit (per-job concurrency); confirm on the next review |
 | B6 | D3, ci run on `4aa6843` | The `@claude` fix pushed after 28 s **without running any test**. Its field-injected `JdbcTemplate` is null when unit tests build `new UserServiceImpl(...)`, so 2 tests in `UserServiceImplTest` hit a NullPointerException. The review had warned about this. `ci` caught it, and branch protection would block the merge. The security fix itself passed (`UserSearchIntegrationTest` 10 out of 10). | CI config | Live run: ci failed with 2 errors | Fixed in this commit: the fix loop gets Java 21 and `mvn test`, and must run the affected tests before pushing. Scratch PR #4 is closed unmerged. |
+| B7 | Claude's review of PR #9 (D4) | The evals gate scored only the result files that arrived. A case job that died first (`setup-java`, a timeout, the early "path has a space" exit) left no file, so 7 passing results with a must-pass case missing read "Gate: PASSED". | evals | `evals/test_gate.py`. After adding just the `expected` parameter, `test_a_missing_must_pass_case_fails_the_gate` failed: the gate printed "3/3 passed... Gate: PASSED". | **Fixed in round 1.** A missing case counts as "NO RESULT" and fails the gate. The early exit now writes a result. The `evals` job also fails when any case job didn't succeed. 16 out of 16 hook and gate tests pass. |
 
 ## 4. Risks
 

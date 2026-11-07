@@ -46,12 +46,12 @@ jobs:
           echo "run=$run" >> "$GITHUB_OUTPUT"
           echo "cases=$(python evals/run.py --list)" >> "$GITHUB_OUTPUT"
           echo "Claude's setup changed: $run"
-      # The hook tests need no model, so they run whenever evals run.
-      - name: PR hook tests
+      # The hook and gate tests need no model, so they run whenever evals run.
+      - name: PR hook and gate tests
         if: steps.decide.outputs.run == 'true'
         run: |
           pip install -q pytest
-          python -m pytest evals/test_hooks.py -q
+          python -m pytest evals/test_hooks.py evals/test_gate.py -q
 
   case:
     needs: changes
@@ -115,5 +115,8 @@ jobs:
       - name: Gate
         if: needs.changes.outputs.run == 'true'
         run: |
-          if [ "${{ needs.changes.result }}" != "success" ]; then echo "The changes job failed (hook tests?)"; exit 1; fi
+          if [ "${{ needs.changes.result }}" != "success" ]; then echo "The changes job failed (hook or gate tests?)"; exit 1; fi
+          # A case job that failed, was cancelled or timed out may have left no result (deploy bug B7).
+          if [ "${{ needs.case.result }}" != "success" ]; then echo "A case job ended '${{ needs.case.result }}'"; exit 1; fi
+          # --gate also fails on any case listed by --list that has no result file.
           python evals/run.py --gate "evals/results/*.json"

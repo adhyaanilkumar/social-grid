@@ -9,7 +9,7 @@ from checks import args, changed_files, mvn_test, tool, verdict  # noqa: E402
 repo, transcript, setup_sha, origin = args()
 changed = changed_files(repo, setup_sha)
 main = [f for f in changed if f.startswith("src/main/java/")]
-tests = [f for f in changed if f.startswith("src/test/java/") and f.endswith("Test.java")]
+tests = [f for f in changed if f.startswith("src/test/java/") and f.endswith(("Test.java", "Tests.java", "IT.java"))]
 text = {f: (repo / f).read_text(encoding="utf-8") for f in main + tests if (repo / f).exists()}
 
 if not any("likes/count" in s for f, s in text.items() if "/controller/" in f):

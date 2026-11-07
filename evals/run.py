@@ -112,9 +112,10 @@ def run_case(name):
     if base:
         Path(base).mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix=f"eval-{name}-", dir=base)).resolve()
-    if " " in str(work):
-        raise SystemExit(f"eval work folder has a space ({work}); set EVAL_WORKDIR to a path without spaces")
     try:
+        if " " in str(work):
+            record.update(passed=False, reason=f"SETUP FAILED: work folder has a space ({work}); set EVAL_WORKDIR")
+            return record
         try:
             setup_sha = prepare(case_dir, spec, work)
         except subprocess.CalledProcessError as error:
@@ -122,9 +123,11 @@ def run_case(name):
             record.update(passed=False, reason=f"SETUP FAILED: {error.stderr or error}")
             return record
         record["claude"] = run_claude(spec, work / "repo", transcript)
+        # The checks run model-written code (tests, pom.xml), so they don't get the Claude token.
+        no_token = {k: v for k, v in os.environ.items() if k != "CLAUDE_CODE_OAUTH_TOKEN"}
         check = subprocess.run([sys.executable, str(case_dir / "check.py"), str(work / "repo"), str(transcript),
                                 setup_sha, str(work / "origin.git")], capture_output=True, text=True,
-                               encoding="utf-8", errors="replace")
+                               encoding="utf-8", errors="replace", env=no_token)
         record.update(passed=check.returncode == 0,
                       reason=(check.stdout.strip().splitlines() or [check.stderr.strip()[-300:]])[-1])
         return record
@@ -137,7 +140,15 @@ def run_case(name):
             shutil.rmtree(work, ignore_errors=True)
 
 
-def gate(records):
+def gate(records, expected=None):
+    # Every expected case must have a result. A case job can die before writing one (setup failure, timeout); scoring
+    # only the files that arrived let a missing must-pass case read "PASSED" (deploy bug B7). Missing means failed.
+    present = {r["case"] for r in records}
+    missing = sorted(set(expected or []) - present)
+    for name in missing:
+        spec_file = CASES / name / "case.json"
+        must = json.loads(spec_file.read_text(encoding="utf-8")).get("must_pass", False) if spec_file.exists() else False
+        records = records + [{"case": name, "must_pass": must, "passed": False, "reason": "NO RESULT: the case never finished"}]
     passed = sum(r["passed"] for r in records)
     rate = passed / len(records) if records else 0
     must_failed = [r["case"] for r in records if r["must_pass"] and not r["passed"]]
@@ -147,9 +158,10 @@ def gate(records):
         turns = (r.get("claude") or {}).get("num_turns", "")
         lines.append(f"| {r['case']} | {'yes' if r['must_pass'] else 'no'} | {'PASS' if r['passed'] else 'FAIL'} "
                      f"| {turns} | {r.get('seconds', '')} | {str(r.get('reason', '')).replace('|', '/')[:160]} |")
-    ok = bool(records) and not must_failed and rate >= PASS_RATE
+    ok = bool(records) and not missing and not must_failed and rate >= PASS_RATE
     lines += ["", f"**Gate: {'PASSED' if ok else 'FAILED'}** (every must-pass case passes, and at least "
-                  f"{PASS_RATE:.0%} overall)" + (f". Must-pass failures: {', '.join(must_failed)}" if must_failed else "")]
+                  f"{PASS_RATE:.0%} overall)" + (f". Must-pass failures: {', '.join(must_failed)}" if must_failed else "")
+              + (f". No result: {', '.join(missing)}" if missing else "")]
     report = "\n".join(lines)
     print(report)
     if os.environ.get("GITHUB_STEP_SUMMARY"):
@@ -170,9 +182,10 @@ def main():
         return 0
     if args.gate is not None:
         files = [f for pattern in args.gate for f in glob.glob(pattern)]
-        return 0 if gate([json.loads(Path(f).read_text(encoding="utf-8")) for f in files]) else 1
-    records = [run_case(name) for name in (args.case or names)]
-    return 0 if gate(records) else 1
+        return 0 if gate([json.loads(Path(f).read_text(encoding="utf-8")) for f in files], expected=names) else 1
+    chosen = args.case or names
+    records = [run_case(name) for name in chosen]
+    return 0 if gate(records, expected=chosen) else 1
 
 
 if __name__ == "__main__":
