@@ -43,8 +43,11 @@ PasswordAuthentication no
 KbdInteractiveAuthentication no
 PermitRootLogin no
 EOF
+# Ubuntu 24.04 starts sshd on demand (ssh.socket), so /run/sshd may not exist yet, and `sshd -t` refuses to check
+# the config without it (deploy bug B9, found on the first real server).
+install -d -m 755 /run/sshd
 sshd -t
-systemctl reload ssh
+systemctl reload ssh 2>/dev/null || systemctl restart ssh
 
 echo "== Firewall"
 ufw allow OpenSSH
