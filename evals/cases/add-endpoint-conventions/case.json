@@ -1,0 +1,26 @@
+{
+  "about": "A small feature, checked against the CLAUDE.md conventions: layers (Service interface plus impl), errors through GlobalExceptionHandler, a JUnit test, and javac -Xlint clean.",
+  "prompt": "Add an endpoint GET /api/posts/{postId}/likes/count for logged-in users. It returns {\"postId\": <id>, \"likeCount\": <count>}, and 404 for a post that doesn't exist. Follow this project's conventions, and add JUnit tests for it.",
+  "allowed_tools": [
+    "Read",
+    "Edit",
+    "Write",
+    "Glob",
+    "Grep",
+    "Bash(mvn -q test:*)",
+    "Bash(mvn test:*)",
+    "Bash(mvn -q -Plint:*)",
+    "Bash(git diff:*)",
+    "Bash(git status:*)",
+    "PowerShell(mvn -q test:*)",
+    "PowerShell(mvn test:*)",
+    "PowerShell(mvn -q -Plint:*)",
+    "PowerShell(git diff:*)",
+    "PowerShell(git status:*)"
+  ],
+  "max_turns": 40,
+  "must_pass": false,
+  "needs": [
+    "java"
+  ]
+}

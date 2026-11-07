@@ -1,0 +1,3 @@
+# Written by run.py on every run; CI keeps them as workflow artifacts.
+results/
+__pycache__/

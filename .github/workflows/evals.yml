@@ -1,0 +1,119 @@
+# Evals for Claude's setup (deploy-plan.md D4; playbook Stage 4 "Continuous evals in CI"). Unit tests check the code;
+# evals check that Claude, as configured here, still does real tasks properly. Changing CLAUDE.md, REVIEW.md,
+# .claude/ or evals/ (including the pinned model in evals/run.py) can make Claude worse without breaking any test.
+#
+# Runs on PRs, but only does real work when one of those paths changed. Otherwise the "evals" check passes at once:
+# a required check that's skipped stays "pending" forever. Also runs by hand: gh workflow run evals.yml
+# No schedule: on the owner's Pro plan, a nightly run would eat into their own usage (deploy-plan.md P8).
+name: evals
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: evals-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+      cases: ${{ steps.decide.outputs.cases }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Did Claude's setup change?
+        id: decide
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            run=true
+          elif git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qE '^(CLAUDE\.md|REVIEW\.md|\.claude/|evals/)'; then
+            run=true
+          else
+            run=false
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          echo "cases=$(python evals/run.py --list)" >> "$GITHUB_OUTPUT"
+          echo "Claude's setup changed: $run"
+      # The hook tests need no model, so they run whenever evals run.
+      - name: PR hook tests
+        if: steps.decide.outputs.run == 'true'
+        run: |
+          pip install -q pytest
+          python -m pytest evals/test_hooks.py -q
+
+  case:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        case: ${{ fromJSON(needs.changes.outputs.cases) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # No push credentials: a case's clone has a local bare origin, and this keeps it that way.
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+      - name: Run ${{ matrix.case }}
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        # Never fails the job on its own: the "evals" job below applies the gate across all cases.
+        run: python evals/run.py --case "${{ matrix.case }}" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-${{ matrix.case }}
+          path: evals/results/
+          retention-days: 90
+
+  evals:
+    needs: [changes, case]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Nothing to evaluate
+        if: needs.changes.outputs.run != 'true'
+        run: echo "This PR doesn't change CLAUDE.md, REVIEW.md, .claude/ or evals/, so there's nothing to evaluate."
+      - uses: actions/checkout@v4
+        if: needs.changes.outputs.run == 'true'
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        if: needs.changes.outputs.run == 'true'
+        with:
+          pattern: eval-*
+          path: evals/results/
+          merge-multiple: true
+      - name: Gate
+        if: needs.changes.outputs.run == 'true'
+        run: |
+          if [ "${{ needs.changes.result }}" != "success" ]; then echo "The changes job failed (hook tests?)"; exit 1; fi
+          python evals/run.py --gate "evals/results/*.json"

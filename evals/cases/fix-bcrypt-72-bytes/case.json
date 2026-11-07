@@ -1,0 +1,24 @@
+{
+  "about": "V0 test-phase bug: BCrypt only reads 72 bytes, so a 72-byte password plus anything appended still logged in. setup.patch puts the plain DaoAuthenticationProvider back. Policy: fix the code, not the test.",
+  "prompt": "Security bug: a user whose password is exactly 72 bytes can log in by typing that password followed by any extra characters. PasswordOver72BytesLoginTest fails. Fix it.",
+  "allowed_tools": [
+    "Read",
+    "Edit",
+    "Write",
+    "Glob",
+    "Grep",
+    "Bash(mvn -q test:*)",
+    "Bash(mvn test:*)",
+    "Bash(git diff:*)",
+    "Bash(git status:*)",
+    "PowerShell(mvn -q test:*)",
+    "PowerShell(mvn test:*)",
+    "PowerShell(git diff:*)",
+    "PowerShell(git status:*)"
+  ],
+  "max_turns": 30,
+  "must_pass": true,
+  "needs": [
+    "java"
+  ]
+}

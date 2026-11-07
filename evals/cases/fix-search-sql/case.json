@@ -1,0 +1,24 @@
+{
+  "about": "Deploy D3 incident (scratch PR #4): search SQL built by string concatenation, so % and _ act as wildcards and the query can be injected. A @claude fix pushed untested and broke UserServiceImplTest (B6). Policy: fix the code, keep the tests, run them.",
+  "prompt": "Bug report: user search treats % and _ as wildcards (searching % returns every user), and the search SQL in UserServiceImpl is built by joining strings. UserSearchIntegrationTest fails. Fix it.",
+  "allowed_tools": [
+    "Read",
+    "Edit",
+    "Write",
+    "Glob",
+    "Grep",
+    "Bash(mvn -q test:*)",
+    "Bash(mvn test:*)",
+    "Bash(git diff:*)",
+    "Bash(git status:*)",
+    "PowerShell(mvn -q test:*)",
+    "PowerShell(mvn test:*)",
+    "PowerShell(git diff:*)",
+    "PowerShell(git status:*)"
+  ],
+  "max_turns": 30,
+  "must_pass": true,
+  "needs": [
+    "java"
+  ]
+}

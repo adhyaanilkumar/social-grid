@@ -12,13 +12,14 @@ Instagram-style photo sharing app. A learning project sized for one laptop. Curr
 - `make test`: JUnit, pytest, Playwright; ends with "All tests passed" (about 10 min, starts Docker)
 - `make test-journey`: the spec 7.4 end-to-end journey. It restarts the backend, so run it alone
 - `make stack-up`: app at http://localhost:5173, API at :8080
+- `python evals/run.py [--case <name>]`: evals of Claude's setup; ends with "Gate: PASSED". On this laptop set `EVAL_WORKDIR=C:\git\.eval-work` (no spaces). Uses Pro usage
 
 ## How we work: the AI-native SDLC (playbook)
 Each cycle lives in `sdlc/v<version>/`. Every stage commits an artifact the next stage reads, and I approve each one.
 1. Plan: propose the version (big feature: 1→2; small feature: 1→1.1; small tweak or fix: 1.1→1.1.1) and I confirm it. Write `intent.md` (Problem, Proposed outcome, Affected users and systems, Constraints, Open questions).
 2. Design: `spec.md` from the approved intent. Flag areas of concern and conflicting policies. Write my decisions into it, with the date.
 3. Build: start in plan mode. Commit `build-plan.md` (files, order, risks, proof) before writing code, and update it in the same commit if the code departs from it. No tests in this stage. Stop for my review after each milestone, then make one commit per milestone.
-4. Test: commit `test-plan.md` (suites, cases, who runs what) first. Then TDD: fix the code, not the test. At most 3 rounds per group (backend, frontend), then stop and hand over to me.
+4. Test: commit `test-plan.md` (suites, cases, who runs what) first. Then TDD: fix the code, not the test. At most 3 rounds per group (backend, frontend), then stop and hand over to me. Changes to CLAUDE.md, REVIEW.md, `.claude/` or `evals/` (including the pinned model) must pass the `evals` check; every incident adds an eval.
 5. Deploy: when build, lint and test all pass, a hook opens a PR to `main`. Claude reviews each PR against `REVIEW.md` (advice only), and `@claude` comments from me get fixes pushed to the branch. I approve and merge it. Never push to `main`. CI (GitHub Actions) builds the images and runs the checks. I approve production releases. Rollback is one command, back to the previous image tag. A bug found during Deploy (by review, CI, a rehearsal or production) goes back through Stage 4's TDD loop: red (a test that fails because of the bug), green (fix the code, never the test), refactor (tidy up while staying green), then all suites again. At most 3 rounds per group, then stop and hand over to me. Log each bug in the cycle's `deploy-plan.md`.
 6. Maintain: uptime checks, error tracking and daily database backups. Claude diagnoses problems on demand, and anything it finds becomes the next cycle's `intent.md`.
 
