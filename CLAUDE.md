@@ -1,116 +1,49 @@
-# [CLAUDE.md](http://CLAUDE.md)
+# social-grid
 
-# Tech Stack
+Instagram-style photo sharing app. A learning project sized for one laptop. Current cycle: V0 (in `sdlc/v0/`).
 
-- Always use the following tech Stack for this project
-  - Backend: Java SpringBoot
-  - Frontend: React
-  - Database: PostGres
-  - Containerization: Docker
-  - Version Control : Git
-- Always use the following testing stack for this application
-  - White Box Automation: JUnit
-  - Black Box Automation: pytest
-  - UI testing: Playwright
+## Stack (always use)
+- Backend: Java 21, Spring Boot 3.5. Frontend: React 19 + Vite. Database: Postgres 18. Docker Compose. Git.
+- Tests: JUnit (white box), pytest (black box), Playwright (UI, desktop and mobile).
 
-# Class Diagram
+## Commands (run from PowerShell; make is GNU make from MSYS2)
+- `make build`: ends with "Build succeeded"
+- `make lint`: ends with "Lint succeeded", zero javac -Xlint:all and oxlint warnings
+- `make test`: JUnit, pytest, Playwright; ends with "All tests passed" (about 10 min, starts Docker)
+- `make test-journey`: the spec 7.4 end-to-end journey. It restarts the backend, so run it alone
+- `make stack-up`: app at http://localhost:5173, API at :8080
 
-- Always follow the given class diagram for the backend implementation of the project  
-classDiagram  
-class User{  
-- id: int  
-- username: String  
-- password: Hash  
-- email: String  
-+ getid() int  
-+ getUserName() String  
-+ setUsername() String  
-}  
-class profile{  
-- first_name: String  
-- last_name: String  
-- bio: String  
-- profile_pic_url: String  
-+ getUsername() String  
-+ getProfilePic() String  
-+ setUsername() String  
-+ setFirstname() String  
-+ setLastname() String  
-+ setBio() String  
-+ setProfilePic() String  
-}  
-class Like{  
-- LikeId: LikeId  
-+ getLikeId() LikeId  
-}  
-class Comment{  
-- CommentId: int  
-- authorId: int  
-- PostId: int  
-- message: String  
-+ getMessage() String  
-+ setMessage()  
-}  
-class Post{  
-- PostId: int  
-- authorid: int  
-- media_url: String  
-- caption: String  
-+ getMediaURL(): String  
-+ getCaption(): String  
-}  
-class FollowId{  
-- FollowerId: int  
-- FolloweeId: int  
-}  
-class LikeId{  
-- PostId: int  
-- UserId: int  
-}  
-class Follows{  
-- id: FollowId   
-}  
-class LikeService <>{  
-+ createLike(): Like  
-+ deleteLike()   
-}  
-class UserService <>{  
-+ login()  
-+ register()  
-+ UpdateProfile()  
-+ UpdateEmail()   
-}  
-class CommentService <>{  
-+ createComment()  
-+ updateMessage()  
-+ deleteComment()  
-}  
-class PostService <>{  
-+ createPost()  
-+ updatePost()  
-+ deletePost()  
-}  
-class FollowService <>{  
-+follow()  
-}  
-User "1"<.. "1"profile  
-User "1"<.. ""LikeService  
-User "1"<.. ""PostService  
-User "1"<.. "1"UserService  
-User "1"<.. ""FollowService  
-User "1"<.. ""CommentService  
-Post "1"-- ""Like  
-Post "1"-- ""Comment  
-Follows "1"<|--"1" FollowId  
-Like "1"<|--"1" LikeId  
-LikeId ""<--"1" User  
-FollowId ""<--"1" User  
-Comment "*"<--"1" User
+## How we work: the AI-native SDLC (playbook)
+Each cycle lives in `sdlc/v<version>/`. Every stage commits an artifact the next stage reads, and I approve each one.
+1. Plan: propose the version (big feature: 1→2; small feature: 1→1.1; small tweak or fix: 1.1→1.1.1) and I confirm it. Write `intent.md` (Problem, Proposed outcome, Affected users and systems, Constraints, Open questions).
+2. Design: `spec.md` from the approved intent. Flag areas of concern and conflicting policies. Write my decisions into it, with the date.
+3. Build: start in plan mode. Commit `build-plan.md` (files, order, risks, proof) before writing code, and update it in the same commit if the code departs from it. No tests in this stage. Stop for my review after each milestone, then make one commit per milestone.
+4. Test: commit `test-plan.md` (suites, cases, who runs what) first. Then TDD: fix the code, not the test. At most 3 rounds per group (backend, frontend), then stop and hand over to me.
+5. Deploy: when build, lint and test all pass, a hook opens a PR to `main`. I approve and merge it. Never push to `main`. CI (GitHub Actions) builds the images and runs the checks. I approve production releases. Rollback is one command, back to the previous image tag.
+6. Maintain: uptime checks, error tracking and daily database backups. Claude diagnoses problems on demand, and anything it finds becomes the next cycle's `intent.md`.
 
+Budget: ₹3,500 a month is the cap across ALL my projects, not just this one, and social-grid is the first to deploy. Keep its share as low as reasonable (estimated ₹1,385–2,030). Before adding anything that costs money, state its monthly cost in INR and stop for my approval. Monitoring that covers all my projects will be planned separately later, so don't build it here.
 
+## Verifying your work
+Run `make build`, `make lint` and `make test` before reporting anything done, and paste the result lines.
+Never skip, weaken or delete a failing test.
 
-# Code Design
+## Conventions
+- Backend layers: Entity, Repository, Service (interface plus `impl/`), Controller. Errors go through `GlobalExceptionHandler` as `ErrorResponse`.
+- Keep session login and CSRF as they are. Frontend API calls go through `apiFetch` in `frontend/src/api/client.ts`.
+- One SQL query per feed page, including a user's posts page (NFR3). Page with keyset paging on `post_id`.
+- JUnit database tests use Testcontainers (`TestDatabaseConfig`). Never use H2 or the dev database.
+- Test users: pytest uses the prefix `t_bb_`, Playwright `t_ui_`. Feeds and search are shared, so never assume they're empty or have exact totals.
+- UI/UX research goes to the `ui-ux-research` agent: Norman, *The Design of Everyday Things*; Krug, *Don't Make Me Think*.
 
-- Always implement the backend in Springboot using Entity, Repository, Service and Controller Layers.
-- Dont worry about Frontend and High Level Design Concepts yet. We are designing a workable model for the time being.
+## Architecture
+- `src/main/java/com/socialgrid/`: controller, service, service/impl, repository, entity, dto, config, exception, validation
+- `frontend/src/`: pages, components, api, lib. Tests are in `src/test`, `tests/blackbox` and `frontend/e2e`
+- Photos are stored in Postgres (`post_images`, bytea) and re-encoded as JPEG on upload. The browser resizes them first.
 
+## Things Claude gets wrong
+- Windows PowerShell 5.1 breaks quoted arguments to git. Write commit messages to a file and use `git commit -F <file>`.
+- In PowerShell, quote `"@journey"`. Unquoted, it's read as a variable.
+- Never rebuild or restart Docker while another test suite is using it.
+- In Claude's sandbox the test JVM can't write to `target/`. Set `MAVEN_ARGS=-DargLine=-Djava.io.tmpdir=<scratchpad>`.
+- Don't run `make` from Git Bash inside the sandbox (Maven fails to start). Use PowerShell.

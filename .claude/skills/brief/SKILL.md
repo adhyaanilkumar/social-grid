@@ -1,30 +1,25 @@
 ---
 name: brief
-description: Describe whatever the user names (a file, class, endpoint, feature, concept, test result or tool) in at most 280 words. Use when the user runs /brief or asks for a short description of something in social-grid.
-argument-hint: <what to describe>
+description: Answer or describe whatever the user names (a file, class, endpoint, feature, concept, status question or tool) in at most 280 characters. Use when the user runs /brief or asks for a very short answer about something in social-grid.
+argument-hint: <what to describe or ask>
 ---
 
-# Describe in at most 280 words
+# Brief: at most 280 characters
 
-The thing to describe is: $ARGUMENTS
+The subject is: $ARGUMENTS
 
 If that is empty, ask the user what to describe in one short question and stop.
 
 ## Steps
 
-1. **Find it before describing it.** If it is part of this repo (a file, class, endpoint, Make target, test or spec section), read the actual code or document first. Never describe from memory or from the name alone. If it doesn't exist here, say so in one line.
-2. **Write the description**, in this order, leaving out any part that doesn't apply:
-   - What it is, in one sentence.
-   - How it works: the mechanism, step by step if there are steps.
-   - Where it lives: `file_path:line_number` links for the key places.
-   - What it does not do, or its known limits, if there are any worth knowing.
-3. **Pitch it at a CS graduate** without professional experience: assume data structures, algorithms, OS and database fundamentals, and define production-engineering terms in a few words the first time they appear (for example "a migration (a versioned database schema change)").
-4. **Count the words.** The description must be 280 words or fewer, including headings and list items; code identifiers count as one word each. If it is over, cut detail rather than meaning, then count again.
-5. End with the count on its own line, in the form `(N words)`.
+1. **Check before answering.** If it's about this repo or its state (a file, class, endpoint, Make target, test, branch, PR or check result), read the code or run a read-only check first. Never answer from memory. If it doesn't exist, say so.
+2. **Answer in 280 characters or fewer**, counting every character including spaces and punctuation, like a tweet. Lead with the direct answer (yes, no, or what it is), then the single most useful detail, such as a `file:line` or the next step.
+3. **Count the characters.** If it's over 280, cut detail rather than meaning, then count again.
+4. End with the count on its own line, in the form `(N chars)`. The count line itself doesn't count toward the limit.
 
 ## Rules
 
-- 280 words is a ceiling, not a target. Shorter is better when the subject is simple.
-- Plain prose or a short list. No tables, no code blocks longer than 3 lines.
-- Don't pad with an introduction or a summary that repeats the description.
-- If something can't be verified from the repo, say "unverified" next to it rather than guessing.
+- 280 is a ceiling, not a target.
+- Plain prose: no headings, tables, lists or code blocks.
+- Define a technical term only if the answer can't be understood without it.
+- If something can't be verified, say "unverified" rather than guessing.
