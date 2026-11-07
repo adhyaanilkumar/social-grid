@@ -1,0 +1,14 @@
+diff --git a/frontend/src/components/post/PostList.tsx b/frontend/src/components/post/PostList.tsx
+index 76ae215..c2873ef 100644
+--- a/frontend/src/components/post/PostList.tsx
++++ b/frontend/src/components/post/PostList.tsx
+@@ -41,8 +41,7 @@ export default function PostList({ options, empty }: { options: FeedOptions; emp
+     )
+   }
+ 
+-  // isError is also true when only a later page failed. Then the loaded posts stay, with the error beside Load more.
+-  if (feed.isError && !feed.data) {
++  if (feed.isError) {
+     return (
+       <div className="flex flex-col items-start gap-3 px-4 min-[480px]:px-0">
+         <p role="alert" className="text-sm">

@@ -1,0 +1,13 @@
+{
+  "about": "The /brief skill (.claude/skills/brief, commit ddb28c5): answers in at most 280 characters.",
+  "prompt": "/brief FeedServiceImpl",
+  "allowed_tools": [
+    "Read",
+    "Glob",
+    "Grep",
+    "Skill"
+  ],
+  "max_turns": 10,
+  "must_pass": false,
+  "needs": []
+}

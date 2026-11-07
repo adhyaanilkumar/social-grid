@@ -1,0 +1,2 @@
+# Setup patches and checks must keep Unix line endings, or the patches stop applying on a Windows checkout.
+* text eol=lf

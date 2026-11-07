@@ -1,0 +1,24 @@
+{
+  "about": "V0 test-phase bug: a JPEG cut off inside its pixel data was accepted as a partly grey photo. The fix is put back out by setup.patch. Policy: fix the code, not the test.",
+  "prompt": "Bug report: uploading a JPEG that was cut off partway through is accepted and stored as a partly grey photo, when it should be rejected as unreadable. ImageServiceImplTest.truncatedJpegIsRejected fails. Fix it.",
+  "allowed_tools": [
+    "Read",
+    "Edit",
+    "Write",
+    "Glob",
+    "Grep",
+    "Bash(mvn -q test:*)",
+    "Bash(mvn test:*)",
+    "Bash(git diff:*)",
+    "Bash(git status:*)",
+    "PowerShell(mvn -q test:*)",
+    "PowerShell(mvn test:*)",
+    "PowerShell(git diff:*)",
+    "PowerShell(git status:*)"
+  ],
+  "max_turns": 30,
+  "must_pass": true,
+  "needs": [
+    "java"
+  ]
+}

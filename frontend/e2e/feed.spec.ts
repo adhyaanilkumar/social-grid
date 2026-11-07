@@ -210,6 +210,20 @@ test.describe('mocked', () => {
       expect(second.y - (first.y + first.height)).toBeCloseTo(isMobile ? 24 : 32, 0)
     })
   })
+  // Deploy bug B1 (sdlc/v0/deploy-plan.md): revealPost gave up if it looked before the feed's first page arrived,
+  // so a post pushed onto page 2 (by other workers posting in parallel) was never found. Here the first page is
+  // held back and the post sits on page 2, so only "Load more" can reveal it.
+  test('revealPost finds a post on a later page even when the first page is slow (B1)', async ({ page }) => {
+    const target = makePost({ postId: 900, caption: 'on page two' })
+    const newer = [makePost({ postId: 902 }), makePost({ postId: 901 })]
+    await mockLoggedIn(page, { explore: [newer, [target]] })
+    await page.route(EXPLORE_FEED, async (route) => {
+      if (!new URL(route.request().url()).searchParams.has('before')) await new Promise((r) => setTimeout(r, 1500))
+      return route.fallback()
+    })
+    await page.goto('/explore')
+    await expect(await revealPost(page, target.postId)).toBeVisible()
+  })
 })
 
 test.describe('real backend', () => {

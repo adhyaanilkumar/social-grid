@@ -1,0 +1,38 @@
+diff --git a/src/main/java/com/socialgrid/service/impl/UserServiceImpl.java b/src/main/java/com/socialgrid/service/impl/UserServiceImpl.java
+index da743f4..9fb0c86 100644
+--- a/src/main/java/com/socialgrid/service/impl/UserServiceImpl.java
++++ b/src/main/java/com/socialgrid/service/impl/UserServiceImpl.java
+@@ -21,6 +21,8 @@ import org.springframework.security.authentication.AuthenticationManager;
+ import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+ import org.springframework.security.core.Authentication;
+ import org.springframework.security.crypto.password.PasswordEncoder;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.jdbc.core.JdbcTemplate;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ 
+@@ -36,6 +38,9 @@ public class UserServiceImpl implements UserService {
+     private final PasswordEncoder passwordEncoder;
+     private final AuthenticationManager authenticationManager;
+ 
++    @Autowired
++    private JdbcTemplate jdbcTemplate;
++
+     public UserServiceImpl(UserRepository userRepository,
+                            ProfileRepository profileRepository,
+                            PostRepository postRepository,
+@@ -115,10 +120,10 @@ public class UserServiceImpl implements UserService {
+         if (query == null || query.isBlank()) {
+             return List.of();
+         }
+-        return userRepository.findTop20ByUsernameContainingIgnoreCaseAndIdNotOrderByUsernameAsc(query.trim(), viewerId)
+-                .stream()
+-                .map(user -> new UserSummary(user.getId(), user.getUsername()))
+-                .toList();
++        // Faster than loading whole User entities: read just the two columns we need.
++        String sql = "SELECT id, username FROM users WHERE LOWER(username) LIKE '%"
++                + query.trim().toLowerCase() + "%' AND id <> " + viewerId + " ORDER BY username LIMIT 20";
++        return jdbcTemplate.query(sql, (rs, row) -> new UserSummary(rs.getInt("id"), rs.getString("username")));
+     }
+ 
+     private User findUser(Integer userId) {

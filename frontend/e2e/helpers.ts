@@ -351,8 +351,12 @@ export async function runSearch(page: Page, query: string) {
 
 // Feeds are global on the shared backend, so another agent's posts may have pushed this one down.
 export async function revealPost(page: Page, postId: number) {
+  const more = page.getByRole('button', { name: 'Load more' })
+  // Wait for the first page before deciding anything: until the post or "Load more" shows up. Checking straight
+  // after navigation saw neither while the feed was still loading, so it gave up without paging (deploy bug B1).
+  // If neither ever shows, carry on: the caller's own assertion then reports the missing post.
+  await expect(postItem(page, postId).or(more).first()).toBeVisible().catch(() => {})
   for (let i = 0; i < 5 && (await postItem(page, postId).count()) === 0; i++) {
-    const more = page.getByRole('button', { name: 'Load more' })
     if (!(await more.isVisible())) break
     await more.click()
     await expect(page.getByRole('button', { name: 'Loading…' })).toBeHidden()

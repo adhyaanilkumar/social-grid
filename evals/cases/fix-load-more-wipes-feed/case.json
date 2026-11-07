@@ -1,0 +1,24 @@
+{
+  "about": "V0 test-phase frontend bug: a failed Load more wiped every loaded post and showed only an error. setup.patch puts the old isError check back in PostList.",
+  "prompt": "Bug report: on Home, if Load more fails, every post already on screen disappears and only an error is shown. The posts should stay, with the error and a retry beside Load more. The Playwright test 'a failed Load more keeps the posts, shows an error and can be tried again' in frontend/e2e/feed.spec.ts fails. Fix it.",
+  "allowed_tools": [
+    "Read",
+    "Edit",
+    "Write",
+    "Glob",
+    "Grep",
+    "Bash(npx playwright test:*)",
+    "Bash(npx oxlint:*)",
+    "Bash(git diff:*)",
+    "Bash(git status:*)",
+    "PowerShell(npx playwright test:*)",
+    "PowerShell(npx oxlint:*)",
+    "PowerShell(git diff:*)",
+    "PowerShell(git status:*)"
+  ],
+  "max_turns": 30,
+  "must_pass": false,
+  "needs": [
+    "node"
+  ]
+}

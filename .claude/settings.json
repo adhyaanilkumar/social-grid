@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/open_pr_when_green.py\"",
+            "timeout": 120,
+            "statusMessage": "Checking whether build, lint and test all passed (opens a PR if so)..."
+          }
+        ]
+      }
+    ]
+  }
+}
