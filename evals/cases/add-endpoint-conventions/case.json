@@ -16,7 +16,10 @@
     "PowerShell(mvn test:*)",
     "PowerShell(mvn -q -Plint:*)",
     "PowerShell(git diff:*)",
-    "PowerShell(git status:*)"
+    "PowerShell(git status:*)",
+    "Bash(tail:*)",
+    "Bash(head:*)",
+    "PowerShell(Select-Object:*)"
   ],
   "max_turns": 40,
   "must_pass": false,
