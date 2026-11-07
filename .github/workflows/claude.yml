@@ -1,0 +1,47 @@
+# The @claude fix loop (deploy-plan.md D3, playbook Stage 5). Comment "@claude <what to change>" on a PR, or in a
+# review or on a line of the diff. Claude changes the PR's branch, commits and pushes, and the new commit goes
+# through the "ci" check like any other. The PR thread records both the request and the change.
+# "@claude review" is handled by claude-review.yml instead.
+# Only the owner's comments trigger it: on a public repo anyone can comment, and this job can push.
+name: claude
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  claude:
+    if: >-
+      github.actor == 'adhyaanilkumar' && (
+        (github.event_name == 'issue_comment'
+          && github.event.issue.pull_request
+          && contains(github.event.comment.body, '@claude')
+          && !contains(github.event.comment.body, '@claude review'))
+        || (github.event_name == 'pull_request_review_comment'
+          && contains(github.event.comment.body, '@claude'))
+        || (github.event_name == 'pull_request_review'
+          && contains(github.event.review.body, '@claude')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read # lets Claude read CI results on the PR
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # CLAUDE.md applies here as on the laptop: fix the code, not the test; never push to main.
+          claude_args: >-
+            --model claude-sonnet-5-5
+            --max-turns 40
