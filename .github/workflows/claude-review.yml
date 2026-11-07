@@ -64,4 +64,5 @@ jobs:
           claude_args: >-
             --model claude-sonnet-5-5
             --max-turns 30
+            --add-dir /tmp
             --allowedTools "Read,Glob,Grep,Write(//tmp/**),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*)"
