@@ -21,7 +21,7 @@ PYTHON ?= python
 # Pass stamps: build, lint and test each record the commit they passed on in .git/checks/<name>.
 # .claude/hooks/open_pr_when_green.py opens a PR to main only when all three match the current commit.
 # A run with uncommitted changes to these paths records "dirty", because what passed isn't what the PR would contain.
-CODE_PATHS := src frontend tests pom.xml Makefile docker-compose.yml Dockerfile
+CODE_PATHS := src frontend tests pom.xml Makefile docker-compose.yml Dockerfile deploy .github
 CHECKS_DIR = $$(git rev-parse --git-dir)/checks
 define clear_pass
 	@mkdir -p "$(CHECKS_DIR)" && rm -f "$(CHECKS_DIR)/$(1)"

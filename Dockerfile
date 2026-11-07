@@ -11,4 +11,8 @@ FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /app/target/social-grid-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# JAVA_OPTS lets production cap the heap (deploy/compose.prod.yml sets -XX:MaxRAMPercentage=75). Without a cap the JVM
+# sizes itself from the whole machine's memory and can starve Postgres. exec makes java the main process, so it gets
+# Docker's stop signal and shuts down cleanly.
+ENV JAVA_OPTS=""
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]

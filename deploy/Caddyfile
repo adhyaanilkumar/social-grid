@@ -1,0 +1,8 @@
+# Caddy gets and renews the HTTPS certificate for $DOMAIN from Let's Encrypt on its own, redirects HTTP to HTTPS,
+# and passes requests to the frontend's nginx. It adds X-Forwarded-For and X-Forwarded-Proto: https, which
+# nginx hands on to Spring (frontend/nginx.conf, application.properties).
+# With DOMAIN=localhost (the D1 laptop test) Caddy uses its own local certificate instead.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy frontend:80
+}
