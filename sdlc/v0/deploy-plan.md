@@ -226,11 +226,19 @@ Each milestone ends with my review stop, then one commit on branch `v0-deploy`. 
 |---|---|
 | `.github/workflows/release.yml` | Started by hand (`gh workflow run release.yml -f tag=<sha>`, or from the Actions tab). It waits for your approval in the `production` environment (P5), then SSHes into the server as `deploy` and runs `release.sh <sha>`. The SSH key and host are stored as GitHub secrets. Rollback is the same workflow with `-f tag=<previous sha>`, or `ssh deploy@<host> ./rollback.sh`. |
 | `deploy/remove-user.sh` (new) | `remove-user.sh <username>` runs on the server. It shows the account and how many posts, comments, likes and follows it has, asks you to type the username to confirm, then deletes them all in one transaction (all or nothing). It's an admin tool for you, not a moderator feature inside the app. |
-| `frontend/e2e/helpers.ts`, `journey.spec.ts` | The journey restarts the backend (step 7) and cleans up its `t_ui_` users through the **local** Docker. I'll point both at the server using Docker's built-in remote mode (`DOCKER_HOST=ssh://deploy@<host>`), so the same commands run there. The test steps and assertions stay exactly as they are. This only changes which machine the commands reach, so it doesn't weaken the test. |
+| `frontend/e2e/helpers.ts`, `journey.spec.ts` | **No change needed (checked in D6).** Production uses the same Compose project name (`social-grid`) and the same container names. With `DOCKER_HOST=ssh://deploy@16.4.116.37` set for that one command, the journey's `docker compose restart backend` and its `docker exec social-grid-db` cleanup act on the server. |
+
+**D6 setup:**
+- `release.yml` runs by hand with a commit SHA and waits for the owner's approval in the `production` environment. Then it checks the images are on GHCR, checks out that commit's `deploy/` files, copies them to `/opt/social-grid`, and runs `release.sh`. Last, it checks `https://social-grid.dev/` (200) and `/api/auth/me` (401) from the outside.
+- SSH from GitHub uses a **separate key**, only for releases, in the `production` environment's secrets. The server's **host key is pinned** (`SSH_KNOWN_HOSTS`), so a server with a different key is refused. `DEPLOY_HOST` and `DEPLOY_DOMAIN` are environment variables, not secrets.
+- `release.sh` now retries the HTTPS check for up to 90 s, because on the first release Caddy still has to get its certificate.
+- The server's `.env` is created on the server. Its database password is generated there and never leaves it.
 
 **Exit check (the M4 definition of done):**
 1. The first release, approved by you on GitHub.
-2. `E2E_BASE_URL=https://<domain> make test-journey` passes: the full 7.4 journey, including the restart, the upload, CSRF POSTs and a reload that keeps the session.
+2. The full 7.4 journey passes on `https://social-grid.dev`: the restart, the upload, CSRF POSTs, and a reload that keeps the session. **Run Playwright directly, never `make test-journey`.** That target first runs `stack-up` (`docker compose up -d --build`), and with `DOCKER_HOST` aimed at the server it would build the laptop's code and start it in production, bypassing CI, the PR and the owner's approval (found while preparing D6). The command, with both settings applied to it alone:
+   `E2E_BASE_URL=https://social-grid.dev DOCKER_HOST=ssh://deploy@16.4.116.37 npx playwright test --grep @journey --workers=1 --project desktop`
+   It runs desktop only, because the login rate limit (10 a minute, burst 5) is shared by the journey's two users.
 3. A real photo uploaded from your phone (spec R9; Playwright here can't test Safari or HEIC).
 4. **Rollback drill:** release a harmless second commit, roll back with one command, check that the site still works and that the earlier tag is running, then release forward again.
 5. The browser shows a valid certificate, and the session cookie is `Secure; HttpOnly; SameSite=Lax`.

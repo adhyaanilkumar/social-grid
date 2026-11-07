@@ -1,0 +1,85 @@
+# Production release (deploy-plan.md D6, playbook Stage 5: "I approve production releases").
+# Started by hand with the commit SHA to run:   gh workflow run release.yml -f tag=<sha>
+# It waits in the "production" environment until the owner approves it on GitHub, then:
+#   1. checks the images for that commit are on GHCR (publish.yml built them when it reached main);
+#   2. copies that commit's deploy files to the server, so the stack definition matches the images;
+#   3. runs /opt/social-grid/release.sh <sha> over SSH: back up the database, swap the images, wait healthy;
+#   4. checks https://social-grid.dev from the outside.
+# Roll back = release the previous SHA (or on the server: ./rollback.sh). It restores code, not data (K2).
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Commit SHA to release (7-40 hex characters). Its images must already be on GHCR."
+        required: true
+
+# One release at a time, and never cancel one halfway.
+concurrency:
+  group: release-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://social-grid.dev
+    env:
+      TAG: ${{ inputs.tag }}
+      HOST: ${{ vars.DEPLOY_HOST }}
+      DOMAIN: ${{ vars.DEPLOY_DOMAIN }}
+    steps:
+      - name: Check the tag is a commit SHA
+        run: |
+          [[ "$TAG" =~ ^[0-9a-f]{7,40}$ ]] || { echo "Not a commit SHA: '$TAG'"; exit 1; }
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Use that commit's deploy files
+        run: git checkout --quiet --detach "$TAG"
+
+      - name: Images exist on GHCR
+        run: |
+          for image in backend frontend; do
+            docker manifest inspect "ghcr.io/${{ github.repository_owner }}/social-grid-$image:$TAG" > /dev/null \
+              || { echo "No social-grid-$image:$TAG on GHCR. Was this commit merged to main and published?"; exit 1; }
+          done
+
+      - name: SSH key and the server's pinned host key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          # tr -d '\r': the secrets were set from Windows, and a stray carriage return breaks the key.
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          # Pinned, not trust-on-first-use: a server answering with another host key is refused.
+          printf '%s\n' "$SSH_KNOWN_HOSTS" | tr -d '\r' > ~/.ssh/known_hosts
+          printf 'Host deploy-target\n  HostName %s\n  User deploy\n  StrictHostKeyChecking yes\n  BatchMode yes\n' "$HOST" > ~/.ssh/config
+
+      - name: Copy the deploy files
+        run: scp deploy/compose.prod.yml deploy/Caddyfile deploy/release.sh deploy/rollback.sh deploy-target:/opt/social-grid/
+
+      - name: Release ${{ inputs.tag }}
+        run: ssh deploy-target "bash /opt/social-grid/release.sh '$TAG'"
+
+      - name: Check from the outside
+        run: |
+          page=$(curl -s -o /dev/null -w '%{http_code}' "https://$DOMAIN/")
+          api=$(curl -s -o /dev/null -w '%{http_code}' "https://$DOMAIN/api/auth/me")
+          echo "https://$DOMAIN/ -> $page, /api/auth/me -> $api"
+          [ "$page" = "200" ] && [ "$api" = "401" ]
+          echo "Released $TAG to https://$DOMAIN" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the key from the runner
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519
