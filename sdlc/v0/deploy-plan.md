@@ -108,6 +108,12 @@ Each milestone ends with my review stop, then one commit on branch `v0-deploy`. 
 
 **Proof:** the PR for D1 and D2 shows a green `ci` check on GitHub. After you merge it, both images appear under the repo's Packages tab with the merge commit's SHA.
 
+**D2 result (2026-11-07):**
+- `ci` passed on its first run on GitHub (PR #2): `make build`, `make lint` and `make test` all ran on Ubuntu.
+- Branch protection is on for `main`: a PR is required, `ci` is a required check, zero approvals are required, it applies to admins too, and force pushes and deleting `main` are blocked. "Applies to admins" matters because the agent pushes with the owner's login. Without it, protection wouldn't stop the agent.
+- After you merged PR #2, `publish.yml` pushed `social-grid-backend:38fd4b3` and `social-grid-frontend:38fd4b3`. Both can be pulled without logging in (200), because the packages took the repo's public visibility. Nothing more to do.
+- **Found during D2:** the PR hook can't push from inside Claude's sandbox, which blocks github.com, so Claude pushed the feature branch itself. The hook also never sees a background `make test` finish, which is now noted in CLAUDE.md.
+
 ### D3. REVIEW.md and Claude reviewing PRs
 
 | File | Change |
@@ -115,8 +121,10 @@ Each milestone ends with my review stop, then one commit on branch `v0-deploy`. 
 | `REVIEW.md` (new, repo root) | The review policy, following the playbook's structure. **Three passes**, with each finding tagged by its pass: **Bugs** (logic errors, edge cases, regressions); **Security** (session login and CSRF left intact, SQL injection, secrets in files or logs, untrusted image parsing, upload limits); **Compliance** (the change matches the cycle's `spec.md`, `build-plan.md` or `deploy-plan.md`, and the CLAUDE.md conventions: layers, `apiFetch`, one SQL query per feed page with keyset paging, Testcontainers not H2, test-user prefixes, and **no weakened, skipped or deleted tests**). **Important** means it breaks behaviour, leaks data or breaks a policy. Everything else is a Nit. **At most 5 Nits**, with the rest given as a count. **Skip:** `package-lock.json`, `frontend/dist`, `target/`, and anything `make lint` already enforces. **Also flag** when a change makes `CLAUDE.md` out of date. |
 | `.github/workflows/claude-review.yml` (new) | `anthropics/claude-code-action` runs on `pull_request` (opened, ready_for_review), and on a PR comment containing `@claude review`. It reads `REVIEW.md` and `CLAUDE.md`, then posts one comment with the findings. Read-only tools: it can't push. Uses the `claude-sonnet-5-5` model. |
 | `.github/workflows/claude.yml` (new) | The `@claude` fix loop: a review comment or PR comment mentioning `@claude` (other than `@claude review`). Claude edits the branch, commits and pushes. It runs **only when the commenter is you** (`github.actor == 'adhyaanilkumar'`), because on a public repo anyone can write a comment. |
-| One-time setup | You run `claude setup-token` and `/install-github-app`. Both need your login, so you type them with the `!` prefix. The token is saved as the `CLAUDE_CODE_OAUTH_TOKEN` repo secret. |
+| One-time setup | **Changed in D3:** you install the Claude GitHub App from its page (https://github.com/apps/claude, for this repo only), run `claude setup-token`, and store the token with `gh secret set CLAUDE_CODE_OAUTH_TOKEN` in your own terminal, so it never passes through this chat. This replaces `/install-github-app`, which also opens its own PR of workflow files that would clash with these. |
 | `CLAUDE.md` | Stage 5 line: "Claude reviews each PR against `REVIEW.md`. When a review flags the same mistake twice, the fix goes into `Things Claude gets wrong`." This feeds what review finds back into Claude's setup, as the playbook describes. |
+
+**Note:** GitHub runs comment-triggered workflows (`issue_comment`) only from `main`. So `@claude review` and the fix loop start working only after D3 is merged. The automatic review on `pull_request` runs on the D3 PR itself.
 
 **Proof:** on the D3 PR itself, Claude posts a review that follows `REVIEW.md` (findings tagged by pass, at most 5 Nits). Then I test the policy by pushing a throwaway commit to a scratch PR that removes a test assertion and uses string-built SQL. The review must flag both as Important. Finally, a `@claude` comment from you adds a fix commit, and `ci` re-runs on it. Then the scratch PR is closed.
 
