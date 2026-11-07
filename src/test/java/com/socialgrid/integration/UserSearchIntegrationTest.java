@@ -74,7 +74,7 @@ class UserSearchIntegrationTest extends PostgresIntegrationTest {
         user("a%c");
         user("abc");
 
-        assertThat(search("%", viewer)).contains("a%c");
+        assertThat(search("%", viewer)).containsExactly("a%c");
         assertThat(search("a%c", viewer)).containsExactly("a%c");
     }
 
@@ -84,6 +84,7 @@ class UserSearchIntegrationTest extends PostgresIntegrationTest {
         user("a_c");
         user("abc");
 
+        assertThat(search("_", viewer)).containsExactly("a_c");
         assertThat(search("a_c", viewer)).containsExactly("a_c");
     }
 

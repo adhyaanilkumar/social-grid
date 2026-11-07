@@ -120,10 +120,18 @@ public class UserServiceImpl implements UserService {
         if (query == null || query.isBlank()) {
             return List.of();
         }
-        // Faster than loading whole User entities: read just the two columns we need.
-        String sql = "SELECT id, username FROM users WHERE LOWER(username) LIKE '%"
-                + query.trim().toLowerCase() + "%' AND id <> " + viewerId + " ORDER BY username LIMIT 20";
-        return jdbcTemplate.query(sql, (rs, row) -> new UserSummary(rs.getInt("id"), rs.getString("username")));
+        // Read just the two columns we need. The input is a bound parameter, and LIKE wildcards are
+        // escaped so that %, _ and \ match literally.
+        String pattern = "%" + escapeLike(query.trim().toLowerCase()) + "%";
+        return jdbcTemplate.query(
+                "SELECT id, username FROM users WHERE LOWER(username) LIKE ? ESCAPE '\\' AND id <> ? "
+                        + "ORDER BY username LIMIT 20",
+                (rs, row) -> new UserSummary(rs.getInt("id"), rs.getString("username")),
+                pattern, viewerId);
+    }
+
+    private static String escapeLike(String input) {
+        return input.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     private User findUser(Integer userId) {
