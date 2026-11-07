@@ -9,6 +9,8 @@ import java.util.Objects;
 @Embeddable
 public class LikeId implements Serializable {
 
+    private static final long serialVersionUID = 1L;
+
     private Integer postId;
     private Integer userId;
 

@@ -10,6 +10,8 @@ import java.util.List;
 // Adapts our User entity to the interface Spring Security authenticates against.
 public class SecurityUser implements UserDetails {
 
+    private static final long serialVersionUID = 1L;
+
     private final Integer id;
     private final String username;
     private final String passwordHash;

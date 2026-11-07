@@ -42,6 +42,12 @@ public interface PostRepository extends JpaRepository<Post, Integer> {
             """)
     List<PostView> findExploreFeed(@Param("me") Integer me, @Param("before") Integer before, Pageable page);
 
+    // NFR3: the user lookup rides in the same statement. Starting from User with a LEFT JOIN gives:
+    //   - no rows at all: no such username (the service turns that into 404);
+    //   - one row with a null postId: the user exists but has no posts on this page (an empty page, not 404);
+    //   - otherwise: the user's posts, exactly as Home and Explore show them.
+    // The paging condition sits in ON, not WHERE, so it can't filter away the user's row.
+
     @Query("""
             SELECT new com.socialgrid.dto.PostView(p.postId, p.authorId, u.username, p.mediaUrl, p.caption,
                 p.width, p.height,
@@ -49,13 +55,12 @@ public interface PostRepository extends JpaRepository<Post, Integer> {
                 (SELECT COUNT(c) FROM Comment c WHERE c.postId = p.postId),
                 CASE WHEN EXISTS (SELECT 1 FROM Like m WHERE m.likeId.postId = p.postId AND m.likeId.userId = :me)
                      THEN true ELSE false END)
-            FROM Post p JOIN User u ON u.id = p.authorId
-            WHERE p.postId < :before
-              AND p.authorId = :authorId
+            FROM User u LEFT JOIN Post p ON p.authorId = u.id AND p.postId < :before
+            WHERE u.username = :username
             ORDER BY p.postId DESC
             """)
-    List<PostView> findUserPosts(@Param("me") Integer me, @Param("authorId") Integer authorId,
-                                 @Param("before") Integer before, Pageable page);
+    List<PostView> findUserPostsByUsername(@Param("me") Integer me, @Param("username") String username,
+                                           @Param("before") Integer before, Pageable page);
 
     long countByAuthorId(Integer authorId);
 }

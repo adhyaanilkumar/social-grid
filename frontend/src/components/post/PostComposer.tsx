@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CircleAlert, ImagePlus, LoaderCircle } from 'lucide-react'
-import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useCallback, useId, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { ApiError } from '@/api/client'
 import { createPost } from '@/api/posts'
 import { Field } from '@/components/form-field'
@@ -15,16 +15,18 @@ const MAX_CAPTION = 2200
 const SHOW_COUNTER_FROM = 2000
 
 function Preview({ photo }: { photo: Blob }) {
-  const [url, setUrl] = useState<string>()
+  // The preview URL holds the photo in memory until it's released. Runs when the photo changes, and React calls
+  // the returned function when the image goes away or the photo changes.
+  const showPhoto = useCallback(
+    (image: HTMLImageElement) => {
+      const url = URL.createObjectURL(photo)
+      image.src = url
+      return () => URL.revokeObjectURL(url)
+    },
+    [photo],
+  )
 
-  // The preview URL holds the photo in memory until it's released.
-  useEffect(() => {
-    const objectUrl = URL.createObjectURL(photo)
-    setUrl(objectUrl)
-    return () => URL.revokeObjectURL(objectUrl)
-  }, [photo])
-
-  return url ? <img src={url} alt="Preview of your photo" className="max-h-[50svh] w-full rounded-lg bg-muted object-contain" /> : null
+  return <img ref={showPhoto} alt="Preview of your photo" className="max-h-[50svh] w-full rounded-lg bg-muted object-contain" />
 }
 
 function errorMessage(error: unknown) {

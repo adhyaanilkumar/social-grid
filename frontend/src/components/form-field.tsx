@@ -4,11 +4,6 @@ import { Label } from '@/components/ui/label'
 
 // Shared by the register and login forms.
 
-// Hint and error ids for aria-describedby, so screen readers read them along with the label.
-export function describedBy(id: string, hasHint: boolean, error: string | undefined) {
-  return [hasHint && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(' ') || undefined
-}
-
 // Label above, hint under the label (or under the input when hintBelow), error under the input.
 export function Field({
   id,

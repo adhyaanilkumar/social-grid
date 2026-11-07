@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
+import { mockCatchAll, ownProfileLink } from './helpers'
 
 // Login, session check and route guard (AD-264). The API is mocked with page.route on the
 // relative /api URLs the app now calls through the Vite dev server (port 5174).
@@ -14,6 +15,12 @@ const BAD_CREDENTIALS = { status: 401, error: 'Unauthorized', message: 'Invalid 
 
 function json(route: Route, status: number, body: unknown) {
   return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
+}
+
+// /home has no welcome line any more, so its heading shows you're on Home and the navigation shows who you are.
+async function expectHomeOfAlice(page: Page) {
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Home')
+  await expect(ownProfileLink(page, ALICE.username)).toHaveAttribute('href', `/users/${ALICE.username}`)
 }
 
 // Counts how many requests of a method reach a path.
@@ -55,6 +62,12 @@ async function mockSession(page: Page, { loggedIn = false } = {}) {
   })
   return session
 }
+
+// The feeds /home now loads, and anything else not mocked below. Each test's own routes win over this, and without
+// it a real response could log a mocked test out or set the XSRF cookie that the CSRF tests expect to be absent.
+test.beforeEach(async ({ page }, info) => {
+  if (!info.titlePath.some((title) => title.startsWith('live'))) await mockCatchAll(page)
+})
 
 test.describe('login form', () => {
   test.beforeEach(async ({ page }) => {
@@ -212,7 +225,7 @@ test.describe('login form', () => {
     await fillValid(page)
     await password(page).press('Enter')
     await expect(page).toHaveURL('/home')
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Welcome, alice_1')
+    await expectHomeOfAlice(page)
   })
 
   test('keyboard: tab order is username, password, submit', async ({ page, isMobile }) => {
@@ -248,7 +261,7 @@ test.describe('route guard and session', () => {
     await fillValid(page)
     await submit(page).click()
     await expect(page).toHaveURL('/home')
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Welcome, alice_1')
+    await expectHomeOfAlice(page)
     await page.goBack()
     await expect(page).toHaveURL('/')
   })
@@ -270,13 +283,13 @@ test.describe('route guard and session', () => {
     await expect(page).toHaveURL('/home')
   })
 
-  test('/home with /me 200 renders welcome; reload stays on /home', async ({ page }) => {
+  test('/home with /me 200 renders Home; reload stays on /home', async ({ page }) => {
     await mockSession(page, { loggedIn: true })
     await page.goto('/home')
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Welcome, alice_1')
+    await expectHomeOfAlice(page)
     await page.reload()
     await expect(page).toHaveURL('/home')
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Welcome, alice_1')
+    await expectHomeOfAlice(page)
   })
 
   test('shows "Checking your session…" while /me is pending, then the page', async ({ page }) => {
@@ -291,7 +304,7 @@ test.describe('route guard and session', () => {
     await expect(status.locator('svg.animate-spin')).toHaveCount(1)
     await expect(page).toHaveURL('/home') // no premature redirect
     release()
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Welcome, alice_1')
+    await expectHomeOfAlice(page)
   })
 
   test('/me 500 (backend broken) is treated as logged out', async ({ page }) => {
@@ -323,8 +336,8 @@ test.describe('route guard and session', () => {
 })
 
 test.describe('CSRF header', () => {
-  test('login POST carries X-XSRF-TOKEN from the XSRF-TOKEN cookie', async ({ page, context }) => {
-    await context.addCookies([{ name: 'XSRF-TOKEN', value: 'tok-123/=+', url: 'http://localhost:5174' }])
+  test('login POST carries X-XSRF-TOKEN from the XSRF-TOKEN cookie', async ({ page, context, baseURL }) => {
+    await context.addCookies([{ name: 'XSRF-TOKEN', value: 'tok-123/=+', url: baseURL! }])
     await page.route(ME, (r) => json(r, 401, UNAUTHORIZED))
     let header: string | undefined
     let meHeader: string | undefined = 'unset'
@@ -343,7 +356,7 @@ test.describe('CSRF header', () => {
     expect(meHeader).toBeUndefined() // GETs don't send it
   })
 
-  test('logout POST carries the header too; no cookie means no header', async ({ page, context }) => {
+  test('logout POST carries the header too; no cookie means no header', async ({ page, context, baseURL }) => {
     await page.route(ME, (r) => json(r, 200, ALICE))
     const headers: (string | undefined)[] = []
     await page.route(LOGOUT, async (r) => {
@@ -355,7 +368,7 @@ test.describe('CSRF header', () => {
     await expect(page).toHaveURL('/login')
     expect(headers).toEqual([undefined])
 
-    await context.addCookies([{ name: 'XSRF-TOKEN', value: 'abc', url: 'http://localhost:5174' }])
+    await context.addCookies([{ name: 'XSRF-TOKEN', value: 'abc', url: baseURL! }])
     await page.unroute(ME)
     await page.route(ME, (r) => json(r, 200, ALICE))
     await page.goto('/home')
@@ -419,12 +432,12 @@ test.describe('live (unmocked, :5173)', () => {
       await password(page).fill('secret123')
       await submit(page).click()
       await expect(page).toHaveURL(`${BASE}/home`)
-      await expect(page.getByRole('heading', { level: 1 })).toHaveText(`Welcome, ${name}`)
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Home')
       await page.screenshot({ path: `${SHOTS}/${tag}-3-home.png`, fullPage: true })
 
       await page.reload()
       await expect(page).toHaveURL(`${BASE}/home`)
-      await expect(page.getByRole('heading', { level: 1 })).toHaveText(`Welcome, ${name}`)
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Home')
 
       await page.getByRole('button', { name: 'Log out' }).click()
       await expect(page).toHaveURL(`${BASE}/login`)

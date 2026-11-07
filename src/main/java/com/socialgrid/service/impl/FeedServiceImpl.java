@@ -2,10 +2,8 @@ package com.socialgrid.service.impl;
 
 import com.socialgrid.dto.PostPage;
 import com.socialgrid.dto.PostView;
-import com.socialgrid.entity.User;
 import com.socialgrid.exception.NotFoundException;
 import com.socialgrid.repository.PostRepository;
-import com.socialgrid.repository.UserRepository;
 import com.socialgrid.service.FeedService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -23,11 +21,9 @@ public class FeedServiceImpl implements FeedService {
     private static final int MAX_LIMIT = 50;
 
     private final PostRepository postRepository;
-    private final UserRepository userRepository;
 
-    public FeedServiceImpl(PostRepository postRepository, UserRepository userRepository) {
+    public FeedServiceImpl(PostRepository postRepository) {
         this.postRepository = postRepository;
-        this.userRepository = userRepository;
     }
 
     @Override
@@ -47,10 +43,16 @@ public class FeedServiceImpl implements FeedService {
     @Override
     @Transactional(readOnly = true)
     public PostPage getUserPosts(Integer viewerId, String username, Integer before, Integer limit) {
-        User author = userRepository.findByUsername(username)
-                .orElseThrow(() -> new NotFoundException("User not found"));
         int size = clamp(limit);
-        return toPage(postRepository.findUserPosts(viewerId, author.getId(), cursor(before), oneExtra(size)), size);
+        List<PostView> rows = postRepository.findUserPostsByUsername(viewerId, username, cursor(before), oneExtra(size));
+        if (rows.isEmpty()) {
+            throw new NotFoundException("User not found");
+        }
+        // A single row with no post means the user exists but nothing is left to show.
+        if (rows.getFirst().postId() == null) {
+            return new PostPage(List.of(), null);
+        }
+        return toPage(rows, size);
     }
 
     private int clamp(Integer limit) {

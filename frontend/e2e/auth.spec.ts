@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { execFileSync } from 'node:child_process'
+import { deleteUsers, ownProfileLink } from './helpers'
 
 // End-to-end auth journeys (AD-246) against the REAL backend — no response mocks. The Vite dev server
 // (:5174) proxies /api to Spring on :8080, so this needs the backend running (e.g. `docker compose up -d`).
@@ -21,7 +21,12 @@ type User = ReturnType<typeof freshUser>
 
 const identifier = (page: Page) => page.getByLabel('Username or email')
 const loginPassword = (page: Page) => page.getByLabel('Password', { exact: true })
-const welcome = (page: Page) => page.getByRole('heading', { level: 1 })
+
+// /home has no welcome line any more, so its heading shows you're on Home and the navigation shows who you are.
+async function expectHomeOf(page: Page, username: string) {
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Home')
+  await expect(ownProfileLink(page, username)).toHaveAttribute('href', `/users/${username}`)
+}
 
 async function registerThroughUi(page: Page, user: User) {
   await page.goto('/register')
@@ -58,22 +63,9 @@ test.beforeAll(async ({ request }) => {
   test.skip(status !== 401, 'real backend not reachable on :8080 — start it with `docker compose up -d`')
 })
 
-// Deletes the users this worker made, straight from Postgres (profiles first: their foreign key to users
-// doesn't cascade). Only its own names, never a t246_% pattern: desktop and mobile run in parallel workers,
-// and one finishing early mustn't delete the other's users mid-test. A failed cleanup only leaves rows
-// behind, so it warns instead of failing the run.
-test.afterAll(() => {
-  if (created.length === 0) return
-  const names = created.map((n) => `'${n}'`).join(',')
-  const sql =
-    `DELETE FROM profiles WHERE user_id IN (SELECT id FROM users WHERE username IN (${names}));` +
-    `DELETE FROM users WHERE username IN (${names});`
-  try {
-    execFileSync('docker', ['exec', 'social-grid-db', 'sh', '-c', `psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -qc "${sql}"`])
-  } catch (e) {
-    console.warn('AD-246 cleanup skipped:', (e as Error).message)
-  }
-})
+// Deletes the users this worker made and what they made (spec section 6). See deleteUsers for why it's named users
+// only and why a failure only warns.
+test.afterAll(() => deleteUsers(created.splice(0), 'AD-246'))
 
 test('successful register lands on login with the username filled in', async ({ page }, info) => {
   const user = freshUser(info.project.name)
@@ -107,19 +99,19 @@ test('successful login by username and by email reaches /home and survives a rel
   await page.goto('/login')
   await logInThroughUi(page, user.username, user.password)
   await expect(page).toHaveURL('/home')
-  await expect(welcome(page)).toHaveText(`Welcome, ${user.username}`)
+  await expectHomeOf(page, user.username)
 
   // The session cookie, not React state, is what keeps you logged in.
   await page.reload()
   await expect(page).toHaveURL('/home')
-  await expect(welcome(page)).toHaveText(`Welcome, ${user.username}`)
+  await expectHomeOf(page, user.username)
 
   // Fresh browser context: log in with the email this time.
   await page.context().clearCookies()
   await page.goto('/login')
   await logInThroughUi(page, user.email, user.password)
   await expect(page).toHaveURL('/home')
-  await expect(welcome(page)).toHaveText(`Welcome, ${user.username}`)
+  await expectHomeOf(page, user.username)
 })
 
 test('bad credentials show one generic error and stay logged out', async ({ page }, info) => {
@@ -154,7 +146,7 @@ test('protected route redirects to login, then back to the page you wanted', asy
 
   await logInThroughUi(page, user.username, user.password)
   await expect(page).toHaveURL('/home')
-  await expect(welcome(page)).toHaveText(`Welcome, ${user.username}`)
+  await expectHomeOf(page, user.username)
 
   // The redirect replaced /login in history, so Back skips the form and returns to where you started.
   await page.goBack()

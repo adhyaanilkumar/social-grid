@@ -48,9 +48,10 @@ export default function Search() {
 
       {results.isSuccess && (
         <>
-          <div role="status" className="flex flex-col gap-1 text-sm">
+          <div role="status" className="flex min-w-0 flex-col gap-1 text-sm">
             {users.length === 0 ? (
-              <p>No users match &ldquo;{query}&rdquo;. Check the spelling or try part of the name.</p>
+              // The query is shown in full, so a long one with no spaces must be allowed to break anywhere (NFR6).
+              <p className="wrap-anywhere">No users match &ldquo;{query}&rdquo;. Check the spelling or try part of the name.</p>
             ) : (
               <p className="text-muted-foreground">
                 {users.length === RESULT_LIMIT
@@ -76,7 +77,7 @@ export default function Search() {
                   className="flex min-h-12 items-center gap-2 rounded-lg text-sm font-semibold hover:underline"
                 >
                   <Avatar username={user.username} />
-                  <span className="truncate">{user.username}</span>
+                  <span className="min-w-0 truncate">{user.username}</span>
                 </Link>
               </li>
             ))}

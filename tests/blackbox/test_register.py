@@ -9,7 +9,7 @@ import uuid
 
 import pytest
 
-from helpers import BASE, csrf_session, login
+from helpers import BASE, create_post, csrf_session, login
 REGISTER = f"{BASE}/api/auth/register"
 PASSWORD = "password1"
 
@@ -214,15 +214,15 @@ def test_follow_twice_is_409_without_field_errors(user):
 
 
 def test_like_twice_is_409_without_field_errors(user):
-    post = user["session"].post(f"{BASE}/api/posts",
-                                json={"mediaUrl": "https://example.com/p.jpg", "caption": "t263a"})
-    assert post.status_code == 201, post.text
-    url = f"{BASE}/api/posts/{post.json()['postId']}/likes"
+    post = create_post(user["session"], caption="t263a")
+    url = f"{BASE}/api/posts/{post['postId']}/likes"
     assert user["session"].post(url).status_code == 201
     r = user["session"].post(url)
     assert r.status_code == 409
     assert r.json()["message"] == "Post already liked"
     assert "fieldErrors" not in r.json()
+    # This t263a_ user isn't covered by the cleanup fixture, so don't leave a post in the shared feeds.
+    assert user["session"].delete(f"{BASE}/api/posts/{post['postId']}").status_code == 204
 
 
 def test_not_found_has_no_field_errors(user):
@@ -238,9 +238,27 @@ def test_update_email_to_taken_address_is_409_on_email(user):
     assert r.json()["fieldErrors"] == {"email": "Email already registered"}
 
 
-# ---------- known bugs found while probing (expected to fail until fixed) ----------
+# ---------- username character rule (spec 4.2) ----------
 
-@pytest.mark.xfail(strict=True, reason="BUG: bcrypt rejects >72 bytes; @Size counts chars, so this is a 500")
+USERNAME_RULE = "Username can only use letters, numbers, dots, dashes and underscores"
+
+
+@pytest.mark.parametrize("template", ["t_bb_{}/x", "t_bb_{} x", "t_bb_{}@x", ".t_bb_{}"],
+                         ids=["slash", "space", "at", "leading-dot"])
+def test_username_rule_refuses_bad_characters(template):
+    body = fresh()
+    body["username"] = template.format(uid())
+    assert_field_error(register(body), "username", USERNAME_RULE)
+
+
+def test_username_rule_allows_dots_dashes_and_underscores():
+    body = fresh()
+    body["username"] = f"t_bb_a.b-c_{uid()}"
+    register_ok(body)
+
+
+# ---------- known bugs found while probing: real failures until the app is fixed ----------
+
 def test_password_over_72_bytes_but_under_72_chars_is_400_not_500():
     body = fresh()
     body["password"] = "é" * 40  # 40 chars, 80 UTF-8 bytes
@@ -249,7 +267,6 @@ def test_password_over_72_bytes_but_under_72_chars_is_400_not_500():
     assert r.json()["fieldErrors"] == {"password": PASSWORD_SIZE}
 
 
-@pytest.mark.xfail(strict=True, reason="BUG: NUL byte reaches Postgres and is mapped to a generic 409")
 def test_nul_in_username_is_400_not_409():
     body = fresh()
     body["username"] = body["username"] + "\u0000"

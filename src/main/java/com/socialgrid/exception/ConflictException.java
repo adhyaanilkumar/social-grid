@@ -2,6 +2,8 @@ package com.socialgrid.exception;
 
 public class ConflictException extends RuntimeException {
 
+    private static final long serialVersionUID = 1L;
+
     // The request field that clashed (e.g. "username"), or null when the conflict isn't about one field.
     private final String field;
 

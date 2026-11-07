@@ -1,5 +1,6 @@
 package com.socialgrid.dto;
 
+import com.socialgrid.validation.MaxUtf8Bytes;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -14,7 +15,10 @@ public record RegisterRequest(
         @Pattern(regexp = "^[A-Za-z0-9][A-Za-z0-9._-]*$",
                 message = "Username can only use letters, numbers, dots, dashes and underscores") String username,
         @NotBlank(message = "Password is required")
-        @Size(min = 8, max = 72, message = "Password must be 8–72 characters") String password,
+        @Size(min = 8, max = 72, message = "Password must be 8–72 characters")
+        // BCrypt rejects more than 72 bytes, and @Size counts characters (e.g. "é" is one character, two bytes).
+        // Same message as @Size, so whichever of the two the validator reports first, the user sees the same text.
+        @MaxUtf8Bytes(value = 72, message = "Password must be 8–72 characters") String password,
         @NotBlank(message = "Email is required")
         @Email(message = "Enter a valid email address") String email) {
 }

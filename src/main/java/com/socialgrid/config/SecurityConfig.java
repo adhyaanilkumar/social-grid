@@ -65,10 +65,11 @@ public class SecurityConfig {
 
     // Checks a username/email + password: loads the user, then compares the BCrypt hash.
     // Unknown users still get a dummy hash comparison, so timing doesn't reveal which accounts exist.
+    // Passwords over BCrypt's 72-byte limit are rejected (see Bcrypt72ByteLimitAuthenticationProvider).
     @Bean
     public AuthenticationManager authenticationManager(UserDetailsService userDetailsService,
                                                        PasswordEncoder passwordEncoder) {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
+        DaoAuthenticationProvider provider = new Bcrypt72ByteLimitAuthenticationProvider(userDetailsService);
         provider.setPasswordEncoder(passwordEncoder);
         return new ProviderManager(provider);
     }

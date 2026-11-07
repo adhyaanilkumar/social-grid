@@ -75,7 +75,8 @@ export default function PostGrid({
     )
   }
 
-  if (grid.isError) {
+  // isError is also true when only a later page failed. Then the loaded tiles stay, with the error beside Load more.
+  if (grid.isError && !grid.data) {
     return (
       <div className="flex flex-col items-start gap-3 px-4">
         <p role="alert" className="text-sm">

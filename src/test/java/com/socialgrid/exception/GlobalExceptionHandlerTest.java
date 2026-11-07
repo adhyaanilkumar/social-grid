@@ -4,14 +4,22 @@ import com.socialgrid.dto.ErrorResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.http.MockHttpInputMessage;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
+import java.sql.SQLException;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -115,5 +123,79 @@ class GlobalExceptionHandlerTest {
                 new MockHttpInputMessage(new byte[0]))).getBody().fieldErrors()).isNull();
         assertThat(handler.handleIntegrity(new DataIntegrityViolationException("x")).getBody().fieldErrors())
                 .isNull();
+    }
+
+    @Test
+    void oversizedUploadIs413() {
+        ResponseEntity<ErrorResponse> res = handler.handleTooLarge(new MaxUploadSizeExceededException(5_242_880));
+
+        assertThat(res.getStatusCode().value()).isEqualTo(413);
+        assertThat(res.getBody().status()).isEqualTo(413);
+        assertThat(res.getBody().message()).isEqualTo("That photo is too large");
+        assertThat(res.getBody().fieldErrors()).isNull();
+    }
+
+    // MaxUploadSizeExceededException is also a MultipartException, so Spring must pick the closer handler
+    // or an oversized photo would be reported as a malformed request.
+    @Test
+    void oversizedUploadRoutesToTheTooLargeHandler() {
+        ExceptionHandlerMethodResolver resolver = new ExceptionHandlerMethodResolver(GlobalExceptionHandler.class);
+
+        assertThat(resolver.resolveMethodByThrowable(new MaxUploadSizeExceededException(1)).getName())
+                .isEqualTo("handleTooLarge");
+        assertThat(resolver.resolveMethodByThrowable(new MultipartException("x")).getName())
+                .isEqualTo("handleMultipart");
+    }
+
+    @Test
+    void unsupportedContentTypeIs415() {
+        ResponseEntity<ErrorResponse> res = handler.handleUnsupportedMediaType(new HttpMediaTypeNotSupportedException(
+                MediaType.APPLICATION_JSON, List.of(MediaType.MULTIPART_FORM_DATA)));
+
+        assertThat(res.getStatusCode().value()).isEqualTo(415);
+        assertThat(res.getBody().status()).isEqualTo(415);
+        assertThat(res.getBody().message()).isNotBlank();
+    }
+
+    @Test
+    void missingPartAsksForAPhoto() {
+        ResponseEntity<ErrorResponse> res = handler.handleMissingPart(new MissingServletRequestPartException("image"));
+
+        assertThat(res.getStatusCode().value()).isEqualTo(400);
+        assertThat(res.getBody().message()).isEqualTo("Choose a photo to post");
+    }
+
+    @Test
+    void multipartFailureIsMalformedRequest() {
+        ResponseEntity<ErrorResponse> res = handler.handleMultipart(new MultipartException("boundary missing"));
+
+        assertThat(res.getStatusCode().value()).isEqualTo(400);
+        assertThat(res.getBody().message()).isEqualTo("Malformed request");
+    }
+
+    @Test
+    void foreignKeyViolationIs404() {
+        DataIntegrityViolationException e = new DataIntegrityViolationException("insert failed",
+                new RuntimeException("wrapped", new SQLException("violates foreign key", "23503")));
+
+        ResponseEntity<ErrorResponse> res = handler.handleIntegrity(e);
+
+        assertThat(res.getStatusCode().value()).isEqualTo(404);
+        assertThat(res.getBody().status()).isEqualTo(404);
+    }
+
+    @Test
+    void uniqueViolationIs409() {
+        DataIntegrityViolationException e = new DataIntegrityViolationException("insert failed",
+                new SQLException("duplicate key", "23505"));
+
+        assertThat(handler.handleIntegrity(e).getStatusCode().value()).isEqualTo(409);
+    }
+
+    @Test
+    void integrityViolationWithoutSqlCauseIs409() {
+        ResponseEntity<ErrorResponse> res = handler.handleIntegrity(new DataIntegrityViolationException("x"));
+
+        assertThat(res.getStatusCode().value()).isEqualTo(409);
     }
 }

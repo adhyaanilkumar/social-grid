@@ -29,7 +29,7 @@ All of these apply to logged-in users only. Logged-out requests get 401 from the
 |---|---|---|
 | FR1 | Create a post | The user chooses a photo from their device, sees a preview, and can add a caption of at most 2,200 characters. Sideways phone photos appear the right way up. A missing, unreadable or unsupported file gives an inline message. The post appears at the top of the author's Home and Explore without a page reload. |
 | FR2 | Delete own post | The delete control shows only on the user's own posts and asks for confirmation inline. Its likes and comments are removed too. Deleting someone else's post through the API gives 403. |
-| FR3 | Home tab | Shows the user's own posts and posts by people they follow, newest first. Posts by anyone else never appear. New users see their own posts or a prompt to go to Explore or search. |
+| FR3 | Home tab | Shows the user's own posts and posts by people they follow, newest first. Posts by anyone else never appear. New users see their own posts or a prompt to create a post or go to Explore (see 5.4). |
 | FR4 | Explore tab | Shows everyone's posts, including the user's own, newest first. |
 | FR5 | Search users | The search bar finds other users by username. Matching ignores case and matches any part of the name. The searcher is excluded. Results link to profiles and never include email addresses. `%` and `_` match literally. |
 | FR6 | View a profile | Any user's profile loads at `/users/{username}` and shows username, name and bio if set, post, follower and following counts, and a grid of that user's posts, newest first. Selecting a grid tile opens the full post, with likes, comments and delete. An unknown username shows a not-found message. |
@@ -47,7 +47,7 @@ All of these apply to logged-in users only. Logged-out requests get 401 from the
 |---|---|
 | NFR1 | Backend code follows Entity, Repository, Service and Controller layers, with the existing service interface plus `impl` pattern (`CLAUDE.md`). |
 | NFR2 | Existing session login, CSRF and error format stay as they are. Errors use `ErrorResponse`. |
-| NFR3 | One feed page makes one database query, not one per post (see 4.3). |
+| NFR3 | One feed page makes one database query, not one per post (see 4.3). This includes a user's posts page (`GET /api/users/{username}/posts`): looking up the user must not add a second query, and an unknown user still gives 404. Decided 2026-11-07. |
 | NFR4 | Sized for one laptop or one small host. No caching layer, queues, replicas or new indexes. |
 | NFR5 | No response exposes another user's email or password hash. |
 | NFR6 | Works on the desktop and mobile Playwright projects, with no horizontal scrolling on mobile. |
@@ -350,7 +350,7 @@ Contrast ratios here are calculated, not measured on rendered screens. The test 
 **Fixes to existing styling:**
 
 - Raise contrast where it fails WCAG AA (4.5:1 for text, 3:1 for controls): input borders, focus rings, placeholders, error text and destructive buttons, muted text on muted backgrounds, and primary button hover.
-- Use one focus style everywhere: 2px solid ring with a 2px offset.
+- Use one focus style everywhere: 2px solid ring with a 2px offset. **Exception (decided 2026-11-07):** profile grid tiles draw the 2px ring inside the tile (offset -4px), because tiles are only 4px apart and an outside ring would overlap the neighbouring tile.
 - Follow the OS theme until the user chooses, set `color-scheme`, and apply the theme from an inline `<head>` script to avoid a light flash.
 - Add the logo to the register page, and make the landing page's sample posts match the real feed.
 

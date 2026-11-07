@@ -1,15 +1,26 @@
 package com.socialgrid.service.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.socialgrid.dto.EmailUpdateRequest;
 import com.socialgrid.dto.LoginRequest;
+import com.socialgrid.dto.ProfileResponse;
 import com.socialgrid.dto.RegisterRequest;
+import com.socialgrid.dto.UserSummary;
+import com.socialgrid.entity.FollowId;
+import com.socialgrid.entity.Profile;
 import com.socialgrid.entity.User;
 import com.socialgrid.exception.ConflictException;
 import com.socialgrid.exception.NotFoundException;
+import com.socialgrid.repository.FollowsRepository;
+import com.socialgrid.repository.PostRepository;
 import com.socialgrid.repository.ProfileRepository;
 import com.socialgrid.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -31,6 +42,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -40,6 +52,10 @@ class UserServiceImplTest {
     private UserRepository userRepository;
     @Mock
     private ProfileRepository profileRepository;
+    @Mock
+    private PostRepository postRepository;
+    @Mock
+    private FollowsRepository followsRepository;
     @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
@@ -149,5 +165,87 @@ class UserServiceImplTest {
         assertThatThrownBy(() -> service.getUser(99))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessage("User not found");
+    }
+
+    private void bobHasCounts() {
+        User bob = new User("bob", "hash", "bob@example.com");
+        ReflectionTestUtils.setField(bob, "id", 2);
+        Profile profile = new Profile(bob);
+        ReflectionTestUtils.setField(profile, "userId", 2);
+        when(profileRepository.findByUserUsername("bob")).thenReturn(Optional.of(profile));
+        when(postRepository.countByAuthorId(2)).thenReturn(5L);
+        when(followsRepository.countByIdFolloweeId(2)).thenReturn(7L);
+        when(followsRepository.countByIdFollowerId(2)).thenReturn(3L);
+    }
+
+    @Test
+    void profileHasPostFollowerAndFollowingCounts() {
+        bobHasCounts();
+        when(followsRepository.existsById(new FollowId(1, 2))).thenReturn(false);
+
+        ProfileResponse profile = service.getProfile("bob", 1);
+
+        assertThat(profile.userId()).isEqualTo(2);
+        assertThat(profile.username()).isEqualTo("bob");
+        assertThat(profile.postCount()).isEqualTo(5);
+        assertThat(profile.followerCount()).isEqualTo(7);
+        assertThat(profile.followingCount()).isEqualTo(3);
+    }
+
+    @Test
+    void followedByMeIsTrueWhenTheViewerFollows() {
+        bobHasCounts();
+        when(followsRepository.existsById(new FollowId(1, 2))).thenReturn(true);
+
+        assertThat(service.getProfile("bob", 1).followedByMe()).isTrue();
+    }
+
+    @Test
+    void followedByMeIsFalseWhenTheViewerDoesNotFollow() {
+        bobHasCounts();
+        when(followsRepository.existsById(new FollowId(1, 2))).thenReturn(false);
+
+        assertThat(service.getProfile("bob", 1).followedByMe()).isFalse();
+    }
+
+    @Test
+    void unknownProfileIs404() {
+        when(profileRepository.findByUserUsername("ghost")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getProfile("ghost", 1)).isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void searchResultsContainNoEmail() throws JsonProcessingException {
+        User bob = new User("bob", "hash", "bob@example.com");
+        ReflectionTestUtils.setField(bob, "id", 2);
+        when(userRepository.findTop20ByUsernameContainingIgnoreCaseAndIdNotOrderByUsernameAsc("bo", 1))
+                .thenReturn(List.of(bob));
+
+        List<UserSummary> results = service.searchUsers("bo", 1);
+
+        assertThat(results).containsExactly(new UserSummary(2, "bob"));
+        // The record is what reaches the client, so check its JSON too (NFR5).
+        assertThat(new ObjectMapper().writeValueAsString(results))
+                .doesNotContain("email")
+                .doesNotContain("bob@example.com")
+                .doesNotContain("hash");
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", "   ", "\t\n"})
+    void blankSearchReturnsEmptyWithoutQuerying(String query) {
+        assertThat(service.searchUsers(query, 1)).isEmpty();
+        verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    void searchTrimsTheQuery() {
+        when(userRepository.findTop20ByUsernameContainingIgnoreCaseAndIdNotOrderByUsernameAsc("bo", 1))
+                .thenReturn(List.of());
+
+        assertThat(service.searchUsers("  bo\t", 1)).isEmpty();
+        verify(userRepository).findTop20ByUsernameContainingIgnoreCaseAndIdNotOrderByUsernameAsc("bo", 1);
     }
 }

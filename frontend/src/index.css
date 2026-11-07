@@ -24,6 +24,7 @@
     --color-ring: var(--ring);
     --color-input: var(--input);
     --color-border: var(--border);
+    --color-destructive-hover: var(--destructive-hover);
     --color-destructive: var(--destructive);
     --color-accent-foreground: var(--accent-foreground);
     --color-accent: var(--accent);
@@ -66,6 +67,7 @@
     --accent: oklch(0.97 0 0);
     --accent-foreground: oklch(0.205 0 0);
     --destructive: oklch(0.53 0.22 27.325); /* 5.85:1 on white */
+    --destructive-hover: oklch(0.47 0.2 27.325); /* hover text, 5.06:1 on the darker hover tint */
     --border: oklch(0.922 0 0); /* decorative only: controls use --input */
     --input: oklch(0.62 0 0); /* 3.64:1, control borders need 3:1 */
     --ring: oklch(0.546 0.245 262.881);
@@ -102,6 +104,7 @@
     --accent: oklch(0.269 0 0);
     --accent-foreground: oklch(0.985 0 0);
     --destructive: oklch(0.704 0.191 22.216);
+    --destructive-hover: oklch(0.78 0.15 22.216); /* hover text, 5.55:1 on the darker hover tint */
     --border: oklch(1 0 0 / 10%);
     --input: oklch(0.55 0 0); /* 4.08:1 */
     --ring: oklch(0.707 0.165 254.624);

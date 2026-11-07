@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 // Uploaded files are untrusted, so the server never stores or serves what it receives. It reads the pixels and
 // draws them onto a new image. Only pixels are copied, so metadata such as a phone photo's GPS location is left behind.
@@ -67,7 +68,16 @@ public class ImageServiceImpl implements ImageService {
                 if (width > MAX_INPUT_SIDE || height > MAX_INPUT_SIDE || width * height > MAX_INPUT_PIXELS) {
                     throw new BadRequestException(TOO_MANY_PIXELS);
                 }
-                return reader.read(0);
+                // A truncated or corrupt JPEG doesn't throw: the reader reports a warning ("Premature end of JPEG
+                // file") and returns a partly grey image. The listener records any warning so we reject the file.
+                // It only records: the JPEG reader calls it from native code, so throwing there is unsafe.
+                AtomicBoolean warned = new AtomicBoolean(false);
+                reader.addIIOReadWarningListener((source, warning) -> warned.set(true));
+                BufferedImage image = reader.read(0);
+                if (warned.get()) {
+                    throw new BadRequestException(UNREADABLE);
+                }
+                return image;
             } finally {
                 reader.dispose();
             }

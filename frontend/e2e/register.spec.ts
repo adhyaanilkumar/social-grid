@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
+import { mockCatchAll } from './helpers'
 
 // Sign-up page (AD-263). The API is mocked with page.route: the test dev server (port 5174)
 // is not a CORS-allowed origin, and mocking lets us force every server answer.
@@ -30,6 +31,7 @@ async function fillValid(page: Page, name = 'alice_1') {
 }
 
 test.beforeEach(async ({ page }) => {
+  await mockCatchAll(page)
   await page.goto('/register')
 })
 

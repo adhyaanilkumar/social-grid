@@ -41,7 +41,8 @@ export default function PostList({ options, empty }: { options: FeedOptions; emp
     )
   }
 
-  if (feed.isError) {
+  // isError is also true when only a later page failed. Then the loaded posts stay, with the error beside Load more.
+  if (feed.isError && !feed.data) {
     return (
       <div className="flex flex-col items-start gap-3 px-4 min-[480px]:px-0">
         <p role="alert" className="text-sm">

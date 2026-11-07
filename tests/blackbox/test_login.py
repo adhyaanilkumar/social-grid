@@ -291,8 +291,6 @@ def test_over_72_byte_password_at_login_is_401_not_500(user, password):
     assert_bad_creds(r)
 
 
-@pytest.mark.xfail(strict=True, reason="BUG: login silently truncates passwords to 72 bytes, so a 72-char "
-                                       "password followed by anything is accepted (related to AD-273)")
 def test_72_char_password_plus_extra_is_not_accepted():
     # bcrypt only reads 72 bytes; an implementation that truncates would accept anything after them.
     u = f"t264a_{uuid.uuid4().hex[:8]}"
@@ -344,24 +342,24 @@ def test_timing_unknown_user_vs_wrong_password(user):
     assert abs(unknown - wrong) < max(unknown, wrong) * 0.5
 
 
-# ---------- known bugs found while probing (expected to fail until fixed) ----------
+# ---------- a username can't be someone's email (spec 4.2's character rule refuses "@") ----------
 
-@pytest.mark.xfail(strict=True, reason="BUG: a username equal to someone's email hijacks their email login "
-                                       "(username is tried first), so the email owner can't log in by email")
-def test_username_that_looks_like_another_users_email_does_not_block_email_login():
-    victim = make_user("t264a")
+def test_registering_username_equal_to_someones_email_is_400():
+    victim = make_user("t_bb")
     squat = victim["email"]
     assert len(squat) <= 30
     r = csrf_session().post("/api/auth/register", json={
-        "username": squat, "password": "password2", "email": f"t264a_{uuid.uuid4().hex[:8]}@example.com"})
-    assert r.status_code == 201, r.text
+        "username": squat, "password": "password2", "email": f"t_bb_{uuid.uuid4().hex[:8]}@example.com"})
+    assert r.status_code == 400, r.text
+    assert r.json()["fieldErrors"] == {
+        "username": "Username can only use letters, numbers, dots, dashes and underscores"}
     _, r = login(victim["email"], victim["password"])
     assert r.status_code == 200, r.text
     assert r.json()["id"] == victim["id"]
 
 
-@pytest.mark.xfail(strict=True, reason="BUG: NUL byte in login identifier reaches Postgres and comes back as a "
-                                       "generic 409 Conflict instead of 401 (same root cause as AD-274)")
+# ---------- known bugs found while probing: real failures until the app is fixed ----------
+
 def test_nul_in_login_identifier_is_401_not_409(user):
     _, r = login(user["username"] + "\u0000", user["password"])
     assert_bad_creds(r)

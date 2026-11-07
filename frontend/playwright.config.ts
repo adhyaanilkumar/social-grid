@@ -8,6 +8,9 @@ const baseURL = process.env.E2E_BASE_URL ?? 'http://localhost:5174'
 export default defineConfig({
   testDir: './e2e',
   reporter: 'list',
+  // Real-backend tests share one laptop's Spring and Postgres. More workers than this makes logins and uploads slow
+  // enough to miss the 5-second assertion timeout, which reads as a flaky test.
+  workers: 4,
   use: {
     baseURL,
     channel: 'chrome',

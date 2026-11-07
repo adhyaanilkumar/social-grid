@@ -8,10 +8,11 @@ import { Link, useLocation, useNavigate, type Location } from 'react-router'
 import { ApiError } from '@/api/client'
 import { useAuth } from '@/auth/auth-context'
 import { SESSION_EXPIRED } from '@/auth/session'
-import { describedBy, Field } from '@/components/form-field'
+import { Field } from '@/components/form-field'
 import Logo from '@/components/landing/Logo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { describedBy } from '@/lib/describedBy'
 
 type LoginField = 'identifier' | 'password'
 type Values = Record<LoginField, string>

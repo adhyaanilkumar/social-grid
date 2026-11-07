@@ -1,8 +1,10 @@
 import { expect, test } from '@playwright/test'
+import { mockCatchAll } from './helpers'
 
 // Smoke tests for the public landing page (AD-243).
 
 test.beforeEach(async ({ page }) => {
+  await mockCatchAll(page)
   await page.goto('/')
 })
 

@@ -9,6 +9,8 @@ import java.util.Objects;
 @Embeddable
 public class FollowId implements Serializable {
 
+    private static final long serialVersionUID = 1L;
+
     private Integer followerId;
     private Integer followeeId;
 
