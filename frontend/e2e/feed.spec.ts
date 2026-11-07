@@ -224,6 +224,30 @@ test.describe('mocked', () => {
     await page.goto('/explore')
     await expect(await revealPost(page, target.postId)).toBeVisible()
   })
+
+  // Deploy bug B10 (sdlc/v0/deploy-plan.md): coming back to a feed shows the cached posts and refreshes them in the
+  // background. Pressing "Load more" before that refresh finished cancelled it, so a post made in the meantime
+  // (here 903) never appeared at the top. Found when composer.spec's FR1 test failed on mobile in `make test`.
+  test('Load more pressed while a revisited feed is refreshing keeps the newest post (B10)', async ({ page }) => {
+    let pages = [[makePost({ postId: 902 }), makePost({ postId: 901 })], [makePost({ postId: 900 })]]
+    await mockLoggedIn(page, { explore: () => pages })
+    await page.goto('/explore')
+    await expect(postItem(page, 902)).toBeVisible()
+    await navLink(page, 'Home').click()
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Home')
+
+    pages = [[makePost({ postId: 903, caption: 'posted meanwhile' }), makePost({ postId: 902 }), makePost({ postId: 901 })], [makePost({ postId: 900 })]]
+    await page.route(EXPLORE_FEED, async (route) => {
+      if (!new URL(route.request().url()).searchParams.has('before')) await new Promise((r) => setTimeout(r, 1500))
+      return route.fallback()
+    })
+    await navLink(page, 'Explore').click()
+    await expect(postItem(page, 902)).toBeVisible()
+    await loadMore(page).click()
+
+    await expect(postItem(page, 903)).toBeVisible()
+    await expect(postItems(page).first()).toHaveId('post-903')
+  })
 })
 
 test.describe('real backend', () => {
