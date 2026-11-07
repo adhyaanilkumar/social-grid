@@ -47,4 +47,5 @@ Never skip, weaken or delete a failing test.
 - Never rebuild or restart Docker while another test suite is using it.
 - In Claude's sandbox the test JVM can't write to `target/`. Set `MAVEN_ARGS=-DargLine=-Djava.io.tmpdir=<scratchpad>`.
 - Don't run `make` from Git Bash inside the sandbox (Maven fails to start). Use PowerShell.
+- Run `make test` in the foreground (it takes about 6 minutes). The PR hook runs when a command returns, and a background command returns as soon as it starts, so the hook never sees the pass.
 - If PowerShell says `make` isn't recognized, add MSYS2 for that command: `$env:Path += ";C:\msys64\usr\bin"`.
