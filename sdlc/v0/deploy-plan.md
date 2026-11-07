@@ -204,6 +204,22 @@ Each milestone ends with my review stop, then one commit on branch `v0-deploy`. 
 
 **Proof:** SSH works for `deploy` with a key and fails for passwords and root. A port scan from the laptop finds only 22, 80 and 443 open.
 
+**D5 result (2026-11-07):**
+- **AWS:** a new account of the owner's, `595163018696` (`adhya_projects`). The owner's old account was closed in May. The "Curiosity Unlocked" login was a temporary sandbox account (`925432503168`, an assumed role), so nothing was deployed there. AWS India's identity check failed twice and then passed. Until it passed, every service answered `OptInRequired`/`SubscriptionRequiredException`.
+- **Budget, for all projects:** `all-projects-monthly` = **$36/month (≈ ₹3,400 including tax)**, the ₹3,500 cap minus the Cloudflare `.com`. AWS Budgets accept only USD on this account. Email alerts at 50% and 80% of actual spend and at 100% forecast. It warns; it doesn't stop spending.
+- **Server:** Lightsail `social-grid`, `ap-south-1a`, Ubuntu 24.04.4, plan `small_3_1` (2 vCPU, 2 GB, 60 GB, $12 ≈ ₹1,339/month), static IP **16.4.116.37**. The Lightsail firewall allows 22/80/443 TCP and 443 UDP. The key pair is `social-grid-admin`: Lightsail names must be unique across resource types, so the key pair couldn't also be called `social-grid`. The IPv6-only $10 plan was rejected: no IPv4 would cut off IPv4-only networks and GitHub's runners.
+- **Created through the AWS MCP** (official `aws-mcp`, signed in to the owner's account). Cloudflare is connected through its official MCP. The owner approved the instance and its price before creation.
+- **`provision.sh` ran (B9 fixed on the way).** Checks on the server:
+  - `sshd -T`: password, keyboard-interactive and root logins are off.
+  - `ufw` denies incoming except 22, 80 and 443.
+  - Docker 29.1 and Compose 2.40 are installed, and `deploy` can use Docker.
+  - Swap: 2 GB, swappiness 10.
+  - Automatic security updates are on.
+  - `/opt/social-grid` is `deploy:deploy 750`.
+  - Rebooted onto the new kernel.
+- **Checks from the laptop:** `deploy` logs in with the key. `root` and password logins get "Permission denied (publickey)". Only 22 answers; 5432, 8080 and 3306 don't.
+- **Still to do in D5:** the domain (buy it, then add an A record `social-grid` → 16.4.116.37, DNS only).
+
 ### D6. Release workflow, first release, and the exit check
 
 | File | Change |
@@ -241,6 +257,7 @@ Workflow and configuration mistakes (the review-posting fixes in D3) have no uni
 | B6 | D3, ci run on `4aa6843` | The `@claude` fix pushed after 28 s **without running any test**. Its field-injected `JdbcTemplate` is null when unit tests build `new UserServiceImpl(...)`, so 2 tests in `UserServiceImplTest` hit a NullPointerException. The review had warned about this. `ci` caught it, and branch protection would block the merge. The security fix itself passed (`UserSearchIntegrationTest` 10 out of 10). | CI config | Live run: ci failed with 2 errors | Fixed in this commit: the fix loop gets Java 21 and `mvn test`, and must run the affected tests before pushing. Scratch PR #4 is closed unmerged. |
 | B7 | Claude's review of PR #9 (D4) | The evals gate scored only the result files that arrived. A case job that died first (`setup-java`, a timeout, the early "path has a space" exit) left no file, so 7 passing results with a must-pass case missing read "Gate: PASSED". | evals | `evals/test_gate.py`. After adding just the `expected` parameter, `test_a_missing_must_pass_case_fails_the_gate` failed: the gate printed "3/3 passed... Gate: PASSED". | **Fixed in round 1.** A missing case counts as "NO RESULT" and fails the gate. The early exit now writes a result. The `evals` job also fails when any case job didn't succeed. 16 out of 16 hook and gate tests pass. |
 | B8 | `evals` on PR #10 (run 42371335033) | `fix-search-sql` (must-pass) failed. Claude fixed the SQL but kept the field-injected `JdbcTemplate` (the B6 pattern) and **never ran the tests**. Its command `MAVEN_ARGS=... mvn ... \| tail -30` was blocked: CLAUDE.md's laptop-sandbox tip didn't say it applies only on the laptop, so Claude followed it in CI, and the env prefix and pipe didn't match the allowed rule. It passed on PR #9's run. Also, the reported reason was a Hibernate `WARN ... SqlExceptionHelper` line, not the failing test. | evals and CLAUDE.md | `evals/test_checks.py`: with real Maven output, `failure_reason` returned the WARN line (red, right reason). | **Fixed in round 1.** CLAUDE.md now says the sandbox tips apply only on the owner's laptop. The Java cases allow `tail` and `head`. `failure_reason` reports test failures first and skips log lines. 19 out of 19 model-free eval tests pass. A one-off eval failure still needs a look: Claude's behaviour varies between runs. |
+| B9 | D5, first run of `provision.sh` on the real server | The script stopped at `sshd -t`: "Missing privilege separation directory: /run/sshd". Ubuntu 24.04 starts sshd on demand (`ssh.socket`), so that folder doesn't exist until the first SSH process creates it. `set -e` stopped the script safely, with SSH still working. | deploy | Live run: `provision-exit=255`. A shell script with no test harness, so live runs are the red and green, as for the CI configuration bugs. | **Fixed in round 1.** The script creates `/run/sshd` before `sshd -t`, and falls back from reload to restart. The re-run exited 0, and every server check passes. |
 
 ## 4. Risks
 
