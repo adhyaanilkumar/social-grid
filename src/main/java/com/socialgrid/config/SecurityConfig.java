@@ -50,6 +50,10 @@ public class SecurityConfig {
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint(errors)
                         .accessDeniedHandler(errors))
+                // No request cache: Spring would save each rejected anonymous request in a new 7-day session, to
+                // replay after login. React handles going back after login itself, and every uptime ping or
+                // crawler hit would otherwise hold a session in memory (B16).
+                .requestCache(cache -> cache.disable())
                 // Invalidates the session and deletes the cookie; answers 200 instead of redirecting.
                 .logout(logout -> logout
                         .logoutUrl("/api/auth/logout")

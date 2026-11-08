@@ -99,6 +99,14 @@ These are shell scripts with no test harness, so the live runs are the red and g
 - `restore-check.sh` on the server restores the R2 copy, and every table's count matches the live database.
 - The next morning, the 03:00 run has happened on its own: there's a new object in R2 and a new ping.
 
+**MT2 results (2026-11-08, production).**
+- **Release:** PR #16's merge commit `f1e02a3` was released through `release.yml` (run 42475496735, approved by the owner), and `https://social-grid.dev/` returned 200 afterwards. An earlier run with an 8-character tag was cancelled before it did anything: images are only tagged with the 7-character short SHA or the full SHA.
+- **Permissions (B12 green):** after `chmod 700 backups` and `chmod 600 backups/*.dump`, the folder is `drwx------` and all 5 release dumps are `-rw-------`. The new daily dump was created as `-rw-------` by `umask 077` alone.
+- **Schedule:** `crontab -l` shows `30 21 * * * bash /opt/social-grid/backup.sh >> /opt/social-grid/backups/backup.log 2>&1` (03:00 IST).
+- **First backup, by hand:** `backup.sh` dumped 1.4M, uploaded `r2:social-grid-backups/daily/daily-20261108T113158Z.dump` and logged "Done", all within 2 seconds. The owner reported that healthchecks.io received the ping. rclone's `Config file ... not found - using defaults` notice is expected: the config comes from environment variables.
+- **Restore drill:** `restore-check.sh` downloaded that object from R2, restored it into a throwaway `postgres:18-alpine`, and every table matched the live database: comments 13, follows 8, likes 17, post_images 12, posts 12, profiles 16, users 16. "Restored OK: every table matches the live database."
+- **Still to check:** the first scheduled run, at 21:30 UTC on 2026-11-08 (03:00 IST on 2026-11-09). It should leave a new object in R2, a new ping, and a "Done" line in `backups/backup.log`.
+
 ### MT3. Uptime checks (mostly you)
 
 **Your steps:** sign up for UptimeRobot (free) and add the two monitors from M4, with alerts to your email.
@@ -107,6 +115,7 @@ These are shell scripts with no test harness, so the live runs are the red and g
 - Both monitors show "Up" within 10 minutes.
 - A temporary third monitor on a host that doesn't exist (for example `https://nope.social-grid.dev/`) goes "Down", and **you get the alert email**. Then delete that monitor.
 - I check the server log to confirm the monitors' 5-minute requests to `/api/auth/me` don't create a session each time.
+  - **Checked before the monitors went on (2026-11-08): they did.** A `*/*` request got a new 7-day session each time. Fixed as B16 (`deploy-plan.md` 3b), and the proof is `curl -H 'Accept: */*' https://social-grid.dev/api/auth/me` getting no `JSESSIONID` after the B16 release.
 
 ### MT4. Close the cycle
 
