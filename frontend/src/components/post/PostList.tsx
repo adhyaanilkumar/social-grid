@@ -25,8 +25,11 @@ export default function PostList({ options, empty }: { options: FeedOptions; emp
   const posts = feed.data?.pages.flatMap((page) => page.items) ?? []
 
   async function loadMore() {
-    const countBefore = posts.length
-    const result = await feed.fetchNextPage()
+    // Coming back to a feed refreshes it in the background. Fetching the next page then would cancel that refresh,
+    // and posts made meanwhile would never appear at the top (deploy bug B10). So let the refresh finish first.
+    const current = feed.isRefetching ? (await feed.refetch({ cancelRefetch: false })).data : feed.data
+    const countBefore = current?.pages.flatMap((page) => page.items).length ?? 0
+    const result = await feed.fetchNextPage({ cancelRefetch: false })
     // Move focus to the first new post, so keyboard users carry on from where the new content starts.
     const firstNew = result.data?.pages.flatMap((page) => page.items)[countBefore]
     if (firstNew) requestAnimationFrame(() => document.getElementById(`post-${firstNew.postId}`)?.focus())
