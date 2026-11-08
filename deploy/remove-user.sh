@@ -11,6 +11,8 @@
 # Likes, comments and photos that other people left on this user's posts go with the posts (ON DELETE CASCADE).
 set -euo pipefail
 cd "$(dirname "$0")"
+# The backup in step 3 holds emails and password hashes: only deploy may read it (maintain review, PR #15).
+umask 077
 
 name="${1:-}"
 # The app's own username rule (RegisterRequest): letters, numbers, dots, dashes and underscores.

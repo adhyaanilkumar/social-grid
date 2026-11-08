@@ -26,9 +26,9 @@ Cycle: V0. Stage: 6, Maintain. Sources: `deploy-plan.md` (section 5, "Not in thi
 Server (Lightsail), cron as the deploy user, every day at 03:00 IST (21:30 UTC)
   └─ backup.sh
        1. pg_dump -Fc from the postgres container   → backups/daily-<UTC time>.dump
-       2. keep the 7 newest daily dumps on the server
-       3. rclone (run as a pinned Docker image)     → R2 bucket social-grid-backups/daily/
-       4. on success only: ping healthchecks.io      (M3)
+       2. rclone (run as a pinned Docker image)     → R2 bucket social-grid-backups/daily/
+       3. only after a good upload: keep the 7 newest daily dumps on the server
+       4. ping healthchecks.io: success at the end, /fail on any error (M3)
 
 R2 lifecycle rule: delete objects under daily/ after 30 days                       (M1)
 healthchecks.io: no ping within 1 day + 1 hour grace → email to you               (M3)
@@ -49,11 +49,13 @@ Same rhythm as Deploy: a review stop after each milestone, then one commit. Befo
 
 | File | Change |
 |---|---|
-| `deploy/backup.sh` (new) | Steps 1–4 above. `set -euo pipefail`, so any failed step stops the script before the ping, and a failure means a missing ping. It logs to `backups/backup.log`. |
+| `deploy/backup.sh` (new) | Steps 1–4 above. `set -Eeuo pipefail` plus an `ERR` trap: any failed step stops the script, logs `FAILED` and pings `/fail`. It logs to `backups/backup.log`. Files are created with `umask 077`. |
+| `deploy/r2.sh` (new) | Shared by `backup.sh` and `restore-check.sh`, which source it. It checks and reads `r2.env`, sets rclone's `r2` remote through environment variables, runs rclone as a pinned image (`rclone_run`), and counts rows per table (`row_counts`). |
 | `deploy/restore-check.sh` (new) | The restore drill. It downloads the newest R2 object (or a named one) and starts a throwaway `postgres:18-alpine` container, `sg-restore-check`, with no volume and no published port. Then it runs `pg_restore`, prints a row count per table next to the live database's, and removes the container whatever happens (a `trap`). It's read-only for production. |
 | `deploy/r2.env.example` (new) | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `HEALTHCHECK_URL`, all empty |
 | `deploy/crontab` (new) | The one line for `deploy`'s crontab |
-| `.github/workflows/release.yml` | Also copies `backup.sh`, `restore-check.sh` and `crontab` to the server |
+| `deploy/release.sh`, `deploy/remove-user.sh` | `umask 077`, so their own backups are private too (review of PR #15, B12) |
+| `.github/workflows/release.yml` | Also copies `r2.sh`, `backup.sh`, `restore-check.sh`, `r2.env.example` and `crontab` to the server |
 
 **Proof (laptop rehearsal, like D1 and D6):** run against a throwaway Postgres loaded with the app's schema and a fixture, using rclone's local-folder backend in place of R2.
 - A dump is written and uploaded, and the 8th local dump removes the oldest.

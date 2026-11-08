@@ -12,16 +12,29 @@ RCLONE_IMAGE="rclone/rclone:1.68.2"
 
 r2_setup() {
   if [ "${REHEARSAL:-0}" = "1" ]; then
-    : "${REHEARSAL_REMOTE_DIR:?set REHEARSAL_REMOTE_DIR for a rehearsal}"
+    [ -n "${REHEARSAL_REMOTE_DIR:-}" ] || { echo "set REHEARSAL_REMOTE_DIR for a rehearsal" >&2; return 1; }
     export RCLONE_CONFIG_R2_TYPE=local
     R2_DEST="r2:/remote/daily"
     return
   fi
   [ -r r2.env ] || { echo "r2.env is missing: copy r2.env.example to r2.env and fill it in (chmod 600)." >&2; return 1; }
+  # Check the format before sourcing. A bad line (a space after "=", quotes) makes bash run the value as a command,
+  # and its error message would print the secret into backup.log. Only line numbers are shown here.
+  local bad
+  bad="$(grep -nvE '^(#.*|[[:space:]]*|[A-Z0-9_]+=[^[:space:]"'\'']*)$' r2.env | cut -d: -f1 | tr '\n' ' ' || true)"
+  if [ -n "$bad" ]; then
+    # Still find the ping URL if its own line is fine, so the failure is reported straight away.
+    HEALTHCHECK_URL="$(grep -E '^HEALTHCHECK_URL=https://[^[:space:]"'\'']+$' r2.env | tail -n 1 | cut -d= -f2- || true)"
+    echo "r2.env line(s) ${bad}must be NAME=value, with no spaces or quotes. Not reading it." >&2
+    return 1
+  fi
   # shellcheck disable=SC1091
   . ./r2.env
-  : "${R2_ACCOUNT_ID:?set in r2.env}" "${R2_ACCESS_KEY_ID:?set in r2.env}" "${R2_SECRET_ACCESS_KEY:?set in r2.env}"
-  : "${R2_BUCKET:?set in r2.env}"
+  # return, not ${VAR:?}: that exits the shell at once, before backup.sh's ERR trap can log and ping /fail.
+  local v
+  for v in R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET; do
+    [ -n "${!v:-}" ] || { echo "${v} is empty in r2.env" >&2; return 1; }
+  done
   export RCLONE_CONFIG_R2_TYPE=s3
   export RCLONE_CONFIG_R2_PROVIDER=Cloudflare
   export RCLONE_CONFIG_R2_ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"

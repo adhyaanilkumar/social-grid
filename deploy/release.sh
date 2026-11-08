@@ -10,6 +10,8 @@
 #   5. check the site answers through Caddy over HTTPS.
 set -euo pipefail
 cd "$(dirname "$0")"
+# The backup in step 2 holds emails and password hashes: only deploy may read it (maintain review, PR #15).
+umask 077
 
 tag="${1:-}"
 if [[ ! "$tag" =~ ^[0-9a-f]{7,40}$ ]]; then
