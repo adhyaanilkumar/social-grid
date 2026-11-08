@@ -63,6 +63,23 @@ Same rhythm as Deploy: a review stop after each milestone, then one commit. Befo
 
 These are shell scripts with no test harness, so the live runs are the red and green, as for `provision.sh` (B9).
 
+**MT1 results (2026-11-08, laptop rehearsal).** Run in Git Bash with `REHEARSAL=1` against a throwaway `postgres:18-alpine` (`sg-rehearsal-db`). The fixture had 5 users, 12 posts and 12 binary `post_images`. rclone 1.68.2 wrote to a local folder in place of R2.
+- **Backup:** dumped (8 KB) and uploaded. After 8 more runs, 7 dumps were left locally and all of them were in the "R2" folder.
+- **Restore drill:** the newest dump restored into `sg-restore-check`, and all 3 tables matched (5/5, 12/12, 12/12). The container and the download folder were gone afterwards.
+- **Failures:**
+  - Wrong database container: exit 1, `FAILED` logged, a `/fail` ping sent, nothing uploaded or deleted.
+  - Bad R2 credentials (the real S3 path, with a bogus account): exit 1 after 9 s, and the new dump was kept locally.
+  - Missing `r2.env`: a clear message, exit 1.
+  - A row added after the backup: "differs" shown for that table, exit 0.
+  - A corrupt newest backup: `pg_restore` error, exit 1, container removed.
+  - A bad backup name: exit 2.
+- **Fixed along the way:**
+  - A failed dump left an empty `.part` file. The error trap now removes it.
+  - With rclone's default retries, bad credentials took about 6 minutes to fail. Retries and timeouts are now capped.
+  - In a Git Bash rehearsal, Docker Desktop can't read `/c/...` paths, so `host_path` uses `cygpath`, which exists only in Git Bash. On the server the path is used as it is.
+  - Bug B11 in `release.yml` (logged in `deploy-plan.md`, section 3b).
+- **Not tested on the laptop:** the real R2 upload and the healthchecks.io success ping. They're tested in MT2. `release.sh` prunes unused images older than 14 days, so the rclone image may be pulled again (about 20 MB) after a release. That's harmless.
+
 ### MT2. R2 and the first real backup (you and me)
 
 **Your steps (dashboard, about 10 minutes):**

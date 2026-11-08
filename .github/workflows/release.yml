@@ -67,7 +67,16 @@ jobs:
           printf 'Host deploy-target\n  HostName %s\n  User deploy\n  StrictHostKeyChecking yes\n  BatchMode yes\n' "$HOST" > ~/.ssh/config
 
       - name: Copy the deploy files
-        run: scp deploy/compose.prod.yml deploy/Caddyfile deploy/release.sh deploy/rollback.sh deploy/remove-user.sh deploy-target:/opt/social-grid/
+        # This workflow file always comes from main, but the deploy files come from the commit being released.
+        # An older commit may not have every file yet (remove-user.sh arrived after 04f403a, the backup files in
+        # MT1), so copy the ones it has; a rollback through this workflow must not fail on a missing file (B11).
+        run: |
+          files=()
+          for f in compose.prod.yml Caddyfile release.sh rollback.sh remove-user.sh \
+                   r2.sh backup.sh restore-check.sh r2.env.example crontab; do
+            if [ -f "deploy/$f" ]; then files+=("deploy/$f"); else echo "Not in $TAG, not copied: deploy/$f"; fi
+          done
+          scp "${files[@]}" deploy-target:/opt/social-grid/
 
       - name: Release ${{ inputs.tag }}
         run: ssh deploy-target "bash /opt/social-grid/release.sh '$TAG'"
