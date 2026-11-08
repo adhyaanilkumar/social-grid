@@ -19,13 +19,18 @@ r2_setup() {
   fi
   [ -r r2.env ] || { echo "r2.env is missing: copy r2.env.example to r2.env and fill it in (chmod 600)." >&2; return 1; }
   # Check the format before sourcing. A bad line (a space after "=", quotes) makes bash run the value as a command,
-  # and its error message would print the secret into backup.log. Only line numbers are shown here.
+  # and its error message would print the secret into backup.log. Values may only use characters with no meaning
+  # to bash ($ ; | ( ` and so on would be run), which covers R2 keys and URLs. Only line numbers are shown here.
+  local value='[A-Za-z0-9._:/@+=-]'
   local bad
-  bad="$(grep -nvE '^(#.*|[[:space:]]*|[A-Z0-9_]+=[^[:space:]"'\'']*)$' r2.env | cut -d: -f1 | tr '\n' ' ' || true)"
+  bad="$(grep -nvE "^(#.*|[[:space:]]*|[A-Z0-9_]+=${value}*)\$" r2.env | cut -d: -f1 | tr '\n' ' ' || true)"
   if [ -n "$bad" ]; then
     # Still find the ping URL if its own line is fine, so the failure is reported straight away.
-    HEALTHCHECK_URL="$(grep -E '^HEALTHCHECK_URL=https://[^[:space:]"'\'']+$' r2.env | tail -n 1 | cut -d= -f2- || true)"
-    echo "r2.env line(s) ${bad}must be NAME=value, with no spaces or quotes. Not reading it." >&2
+    # Only when found: otherwise keep whatever the caller already had (PR #16 review).
+    local url
+    url="$(grep -E "^HEALTHCHECK_URL=https://${value}+\$" r2.env | tail -n 1 | cut -d= -f2- || true)"
+    [ -z "$url" ] || HEALTHCHECK_URL="$url"
+    echo "r2.env line(s) ${bad}must be NAME=value: no spaces or quotes, and only letters, digits and . _ : / @ + = - in the value. Not reading it." >&2
     return 1
   fi
   # shellcheck disable=SC1091
