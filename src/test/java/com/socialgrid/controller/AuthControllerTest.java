@@ -320,6 +320,18 @@ class AuthControllerTest {
         verifyNoInteractions(userService);
     }
 
+    // B16: an anonymous request that isn't JSON (an uptime monitor, a crawler) must not create a session.
+    // Spring's default request cache saved it in a new 7-day in-memory session, one per request.
+    // A fresh context: csrf() in the other tests swaps the shared CSRF filter onto a session-based store.
+    @Test
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
+    void anonymousNonJsonRequestCreatesNoSession() throws Exception {
+        MvcResult result = mvc.perform(get("/api/auth/me").accept(MediaType.ALL))
+                .andExpect(status().isUnauthorized())
+                .andReturn();
+        assertThat(result.getRequest().getSession(false)).isNull();
+    }
+
     // HTTP Basic is gone: credentials in an Authorization header are ignored.
     @Test
     void basicAuthHeaderNoLongerLogsIn() throws Exception {

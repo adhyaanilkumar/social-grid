@@ -74,14 +74,18 @@ def test_login_cookie_attributes(user):
 
 def test_session_id_changes_on_login(user):
     s = csrf_session()
-    before = s.cookies.get("JSESSIONID")
-    assert before, "expected the priming GET to create a pre-login session"
-    s.post(LOGIN, json={"identifier": user["username"], "password": user["password"]})
-    after = s.cookies.get("JSESSIONID")
-    assert after and after != before
-    # The pre-login ID (one an attacker could have planted) must not be logged in.
-    planted = requests.get(f"{BASE}{ME}", cookies={"JSESSIONID": before}, timeout=10)
-    assert planted.status_code == 401
+    # B16: an anonymous GET creates no session at all, so there's no pre-login ID to fixate.
+    assert s.cookies.get("JSESSIONID") is None
+    # An attacker can still plant a made-up ID in the victim's browser before they log in.
+    planted = f"PLANTED{uuid.uuid4().hex.upper()}"
+    r = s.post(LOGIN, json={"identifier": user["username"], "password": user["password"]},
+               cookies={"JSESSIONID": planted})
+    assert r.status_code == 200, r.text
+    after = r.cookies.get("JSESSIONID")
+    assert after and after != planted
+    # The planted ID must not be logged in; the real one is.
+    assert requests.get(f"{BASE}{ME}", cookies={"JSESSIONID": planted}, timeout=10).status_code == 401
+    assert requests.get(f"{BASE}{ME}", cookies={"JSESSIONID": after}, timeout=10).status_code == 200
 
 
 # ---------- bad credentials ----------
