@@ -15,6 +15,12 @@ def test_health_is_up_and_public():
     assert r.json() == {"status": "UP"}
 
 
+def test_health_answers_head_like_the_monitor():
+    # B19: the free UptimeRobot plan sends HEAD, and got 401 while GET got 200.
+    r = requests.head(f"{PROXY}{HEALTH}", headers={"Accept": "*/*"}, timeout=10)
+    assert r.status_code == 200
+
+
 def test_health_creates_no_session():
     r = requests.get(f"{BASE}{HEALTH}", headers={"Accept": "*/*"}, timeout=10)
     assert "JSESSIONID" not in r.cookies
