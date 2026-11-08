@@ -121,7 +121,7 @@ These are shell scripts with no test harness, so the live runs are the red and g
 
 **MT3 results (2026-11-08).**
 - **B16 live green:** after release `8ccb3dd` (B16, B17, B18), `Accept: */*` requests to `/`, `/api/auth/me`, `/api/posts` and `/api/feed` set no `JSESSIONID`.
-- **Account:** UptimeRobot free, signed up with Google as adhya.a1205@gmail.com. Email alerts are set to "no delay, no repeat", so there's one email when a monitor goes down and one when it's back up. The 10 page monitors the onboarding suggested (`/cart`, `/wp-admin` and so on) were not created.
+- **Account:** UptimeRobot free, signed up with Google (the owner's account). Email alerts are set to "no delay, no repeat", so there's one email when a monitor goes down and one when it's back up. The 10 page monitors the onboarding suggested (`/cart`, `/wp-admin` and so on) were not created.
 - **Monitor 1, `https://social-grid.dev/`:** HTTP, every 5 minutes, "Up".
 - **Alert path, proven:** the temporary `https://nope.social-grid.dev/` monitor went "Down: DNS Resolving problem", and "Monitor is DOWN: nope.social-grid.dev/" reached Gmail at 13:17:47 UTC. That monitor was then deleted.
 - **`/api/auth/me` can't be monitored on the free plan:** see M4 amended. Both the HTTP and the keyword monitor went "Down | 401" (alert at 13:17:13 UTC) and were deleted.
