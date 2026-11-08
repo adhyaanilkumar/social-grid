@@ -10,6 +10,8 @@
 #      arrives at all, and healthchecks.io emails the owner after a day.
 set -Eeuo pipefail
 cd "$(dirname "$0")"
+# Dumps hold emails and password hashes: files only deploy can read (600), folders only deploy can open (700).
+umask 077
 . ./r2.sh
 
 log() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $*"; }
@@ -18,10 +20,11 @@ ping_healthcheck() {
   [ -n "${HEALTHCHECK_URL:-}" ] && curl -fsS -m 10 --retry 3 -o /dev/null "${HEALTHCHECK_URL}$1" || true
 }
 
+name="daily-$(date -u +%Y%m%dT%H%M%SZ).dump"
+# Set before r2_setup, so a missing or broken r2.env is logged and reported too.
+trap 'log "FAILED at line $LINENO"; rm -f "backups/${name}.part"; ping_healthcheck /fail' ERR
 r2_setup
 mkdir -p backups
-name="daily-$(date -u +%Y%m%dT%H%M%SZ).dump"
-trap 'log "FAILED at line $LINENO"; rm -f "backups/${name}.part"; ping_healthcheck /fail' ERR
 log "Backing up to ${name}"
 
 # 1. Dump to a temporary name first, so a dump that fails halfway never looks like a good backup.
@@ -39,7 +42,11 @@ ls -1t backups/daily-*.dump | tail -n +8 | xargs -r rm --
 
 # Keep the log short: the last 1000 lines are about a year of backups.
 if [ -f backups/backup.log ] && [ "$(wc -l < backups/backup.log)" -gt 1000 ]; then
-  tail -n 1000 backups/backup.log > backups/backup.log.tmp && mv backups/backup.log.tmp backups/backup.log
+  # Rewrite in place, not mv: cron's ">>" keeps the old file open, and lines written after an mv would go to a
+  # file that no longer has a name.
+  tail -n 1000 backups/backup.log > backups/backup.log.tmp
+  cat backups/backup.log.tmp > backups/backup.log
+  rm -f backups/backup.log.tmp
 fi
 
 ping_healthcheck ""

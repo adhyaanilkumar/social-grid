@@ -12,6 +12,7 @@
 # Counts can differ if people posted after the backup was taken. Right after a manual backup.sh they must match.
 set -euo pipefail
 cd "$(dirname "$0")"
+umask 077   # the download holds personal data, like the dumps (backup.sh)
 . ./r2.sh
 
 check="sg-restore-check"
@@ -24,7 +25,13 @@ r2_setup
 name="${1:-}"
 if [ -z "$name" ]; then
   # Names are UTC timestamps, so the alphabetically last one is the newest.
-  name="$(rclone_run "$work" lsf --files-only --include 'daily-*.dump' "${R2_DEST}/" | sort | tail -n 1)"
+  # Said out loud: under set -e a failed listing would otherwise end the script with only rclone's own error.
+  # R2 also answers "directory not found" when daily/ has no objects yet.
+  if ! listing="$(rclone_run "$work" lsf --files-only --include 'daily-*.dump' "${R2_DEST}/")"; then
+    echo "Couldn't list ${R2_DEST}/: no backups there yet, or R2 can't be reached (see rclone's error above)." >&2
+    exit 1
+  fi
+  name="$(printf '%s\n' "$listing" | sort | tail -n 1)"
   [ -n "$name" ] || { echo "No backups found in ${R2_DEST}/" >&2; exit 1; }
 fi
 [[ "$name" =~ ^daily-[0-9]{8}T[0-9]{6}Z\.dump$ ]] || { echo "Not a backup name: '${name}'" >&2; exit 2; }
