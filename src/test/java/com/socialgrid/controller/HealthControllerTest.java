@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -54,6 +55,16 @@ class HealthControllerTest {
         mvc.perform(get("/api/health").accept(MediaType.ALL))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(content().json("{\"status\":\"DOWN\"}", JsonCompareMode.STRICT));
+    }
+
+    // B19: UptimeRobot's free plan sends HEAD, not GET (the method is a paid setting). Spring answers HEAD from
+    // the GET handler, but security only let GET through, so the monitor got 401 and went "Down".
+    @Test
+    void headIsAllowedForTheMonitor() throws Exception {
+        when(healthService.databaseUp()).thenReturn(true);
+
+        mvc.perform(head("/api/health").accept(MediaType.ALL))
+                .andExpect(status().isOk());
     }
 
     // A ping every 5 minutes must not leave a session behind (B16).
