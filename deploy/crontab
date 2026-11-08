@@ -1,0 +1,6 @@
+# The deploy user's crontab (maintain-plan.md MT1). Install on the server, as deploy:
+#   crontab /opt/social-grid/crontab
+# That replaces deploy's whole crontab, so keep every job in this file. Check with: crontab -l
+#
+# Cron uses the server's clock, which is UTC. 21:30 UTC = 03:00 IST, when almost nobody is using the app.
+30 21 * * * bash /opt/social-grid/backup.sh >> /opt/social-grid/backups/backup.log 2>&1
