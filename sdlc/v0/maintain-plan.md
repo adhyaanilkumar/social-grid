@@ -18,6 +18,8 @@ Cycle: V0. Stage: 6, Maintain. Sources: `deploy-plan.md` (section 5, "Not in thi
 | M3 | How do you hear about a failed backup? | **A free [healthchecks.io](https://healthchecks.io) check.** The backup job pings a private URL when it succeeds, and healthchecks.io emails you when a day passes with no ping. Without it, a broken cron job fails silently, and you'd only find out when you needed the backup. This is a check on the backup itself, not general monitoring, but it's still an extra account. Say no and I'll leave it out. | ₹0 (free plan for hobby use: 20 checks; I'll confirm the terms at setup) |
 | M4 | What does the uptime checker watch? | **Two UptimeRobot free monitors, every 5 minutes, alerting by email:** (1) `https://social-grid.dev/`, the frontend through Caddy; (2) `https://social-grid.dev/api/auth/me`, the backend through Caddy. A logged-out request gets 401, and UptimeRobot counts a 401 as "up" when the monitor has no login details set. A 502 from Caddy, when the backend is down, counts as "down". No code changes are needed. | ₹0. 50 monitors at 5-minute checks are free. Recent terms changes allow any use, and this is personal anyway. Custom status codes and heartbeat monitors are paid features, so we don't use them. |
 
+**M4 amended 2026-11-08 (owner's decision):** monitor (2) is `https://social-grid.dev/api/health`, not `/api/auth/me`. My claim above that UptimeRobot counts a 401 as "up" was wrong. On the free plan only 2xx and 3xx count as up, and a free keyword monitor fails on the 401 too: both were tried, went "Down" at once, and were deleted. `GET /api/health` is public and runs `SELECT 1`. It answers 200 `{"status":"UP"}`, or 503 `{"status":"DOWN"}` when the database doesn't answer. So one monitor covers Caddy, nginx, the backend and the database. It's a small code change, test-first, with no extra cost.
+
 **Total for social-grid stays about ₹1,420–1,440 a month** (Lightsail plus the domain). Nothing in this plan costs money.
 
 ## 2. How it fits together
@@ -32,7 +34,7 @@ Server (Lightsail), cron as the deploy user, every day at 03:00 IST (21:30 UTC)
 
 R2 lifecycle rule: delete objects under daily/ after 30 days                       (M1)
 healthchecks.io: no ping within 1 day + 1 hour grace → email to you               (M3)
-UptimeRobot: GET / and GET /api/auth/me every 5 minutes → email when down         (M4)
+UptimeRobot: GET / and GET /api/health every 5 minutes → email when down           (M4, amended)
 ```
 
 Points to note:
@@ -109,13 +111,21 @@ These are shell scripts with no test harness, so the live runs are the red and g
 
 ### MT3. Uptime checks (mostly you)
 
-**Your steps:** sign up for UptimeRobot (free) and add the two monitors from M4, with alerts to your email.
+**Your steps:** sign up for UptimeRobot (free) and add the two monitors from M4 (as amended: `/` and `/api/health`), with alerts to your email.
 
 **Proof, with no downtime for real users:**
 - Both monitors show "Up" within 10 minutes.
 - A temporary third monitor on a host that doesn't exist (for example `https://nope.social-grid.dev/`) goes "Down", and **you get the alert email**. Then delete that monitor.
 - I check the server log to confirm the monitors' 5-minute requests to `/api/auth/me` don't create a session each time.
   - **Checked before the monitors went on (2026-11-08): they did.** A `*/*` request got a new 7-day session each time. Fixed as B16 (`deploy-plan.md` 3b), and the proof is `curl -H 'Accept: */*' https://social-grid.dev/api/auth/me` getting no `JSESSIONID` after the B16 release.
+
+**MT3 results (2026-11-08).**
+- **B16 live green:** after release `8ccb3dd` (B16, B17, B18), `Accept: */*` requests to `/`, `/api/auth/me`, `/api/posts` and `/api/feed` set no `JSESSIONID`.
+- **Account:** UptimeRobot free, signed up with Google as adhya.a1205@gmail.com. Email alerts are set to "no delay, no repeat", so there's one email when a monitor goes down and one when it's back up. The 10 page monitors the onboarding suggested (`/cart`, `/wp-admin` and so on) were not created.
+- **Monitor 1, `https://social-grid.dev/`:** HTTP, every 5 minutes, "Up".
+- **Alert path, proven:** the temporary `https://nope.social-grid.dev/` monitor went "Down: DNS Resolving problem", and "Monitor is DOWN: nope.social-grid.dev/" reached Gmail at 13:17:47 UTC. That monitor was then deleted.
+- **`/api/auth/me` can't be monitored on the free plan:** see M4 amended. Both the HTTP and the keyword monitor went "Down | 401" (alert at 13:17:13 UTC) and were deleted.
+- **Still to do:** release `/api/health`, then add monitor 2 on it and see it show "Up".
 
 ### MT4. Close the cycle
 
