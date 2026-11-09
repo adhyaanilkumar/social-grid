@@ -107,7 +107,7 @@ These are shell scripts with no test harness, so the live runs are the red and g
 - **Schedule:** `crontab -l` shows `30 21 * * * bash /opt/social-grid/backup.sh >> /opt/social-grid/backups/backup.log 2>&1` (03:00 IST).
 - **First backup, by hand:** `backup.sh` dumped 1.4M, uploaded `r2:social-grid-backups/daily/daily-20261108T113158Z.dump` and logged "Done", all within 2 seconds. The owner reported that healthchecks.io received the ping. rclone's `Config file ... not found - using defaults` notice is expected: the config comes from environment variables.
 - **Restore drill:** `restore-check.sh` downloaded that object from R2, restored it into a throwaway `postgres:18-alpine`, and every table matched the live database: comments 13, follows 8, likes 17, post_images 12, posts 12, profiles 16, users 16. "Restored OK: every table matches the live database."
-- **Still to check:** the first scheduled run, at 21:30 UTC on 2026-11-08 (03:00 IST on 2026-11-09). It should leave a new object in R2, a new ping, and a "Done" line in `backups/backup.log`.
+- **First scheduled run (2026-11-09, 03:00 IST):** cron started `backup.sh` at 21:30:01 UTC on 2026-11-08 with nobody logged in. It dumped 1.5M, uploaded `r2:social-grid-backups/daily/daily-20261108T213001Z.dump` and logged "Done" at 21:30:04. The local copy is `-rw-------`, like the earlier ones. `backup.sh` sends the success ping just before "Done". healthchecks.io emails if no ping arrives within the 1-hour grace period. That proves the daily backups run on their own. The owner pasted the log and file listing.
 
 ### MT3. Uptime checks (mostly you)
 
@@ -125,13 +125,15 @@ These are shell scripts with no test harness, so the live runs are the red and g
 - **Monitor 1, `https://social-grid.dev/`:** HTTP, every 5 minutes, "Up".
 - **Alert path, proven:** the temporary `https://nope.social-grid.dev/` monitor went "Down: DNS Resolving problem", and "Monitor is DOWN: nope.social-grid.dev/" reached Gmail at 13:17:47 UTC. That monitor was then deleted.
 - **`/api/auth/me` can't be monitored on the free plan:** see M4 amended. Both the HTTP and the keyword monitor went "Down | 401" (alert at 13:17:13 UTC) and were deleted.
-- **Still to do:** release `/api/health`, then add monitor 2 on it and see it show "Up".
+- **Monitor 2, `https://social-grid.dev/api/health`:** released in `e950eac` (PR #19). The first check failed with 401, because the free plan sends HEAD and only GET was open (B19, fixed in `8ef5f94`, PR #20). The monitor was paused, then resumed after that release, and now shows "Up". **MT3 is done**: both monitors are up, and a real alert email was proven to arrive.
 
 ### MT4. Close the cycle
 
 - Record the results here.
 - Write the runbook below into `README.md`'s operations section.
-- Collect the V0 follow-ups (list below) into a draft of the next cycle's `intent.md`, for you to pick from when you start V0.1 or V1.
+- Collect the V0 follow-ups (list below). Writing the next cycle's `intent.md` from them is the next cycle's Plan stage, not Maintain (owner's decision, 2026-11-08).
+- **Runbook done (2026-11-08):** `README.md` has an "Operations (production)" section covering releases, rollback, backups, monitoring, the runbook table, an unrehearsed live-restore procedure, and the access rules.
+- **V0 Maintain closed (2026-11-09):** MT1 to MT4 are done, after the first scheduled backup was confirmed. The follow-ups in section 6 go to the next cycle's Plan stage.
 
 ## 4. Runbook (what to do when...)
 
@@ -164,4 +166,9 @@ These are shell scripts with no test harness, so the live runs are the red and g
   - the comment box wipes text typed while an earlier comment is still posting;
   - old `t263a_` and `t264a_` test users;
   - Flyway migrations (K2);
-  - the HEIC photo check (D6 item 3).
+  - the HEIC photo check (D6 item 3);
+  - a repeatable shell test for `r2_setup` (bad line, empty value, missing file, shell syntax): B14, B15, B17 and B18 were proven by hand only (reviews of PRs #16 and #18);
+  - a lower Hikari connection timeout (30 s now, about the same as UptimeRobot's), so a hung database gives a clean 503 instead of a timeout. It affects every request, so it needs its own look (review of PR #19);
+  - live-restore procedure in `README.md` is unrehearsed against a production-like database;
+  - commits carry the owner's real email address in a public repo. GitHub's "Keep my email addresses private" and a noreply `user.email` would cover future commits (review of PR #19);
+  - the two UptimeRobot monitors exist only in its dashboard, not in code, so recreating them is manual (see `README.md`, Monitoring).
